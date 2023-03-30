@@ -9,7 +9,7 @@ setup(
     author_email='lukas.dirnberger@tum.de',
     license='todo',
     packages=['cvde'],
-    install_requires=['streamlit', 'streamlit-on-Hover-tabs'],
+    install_requires=['streamlit', 'streamlit-on-Hover-tabs', 'begins', 'opencv-python'],
 
     classifiers=[
         'Development Status :: 1 - Planning',

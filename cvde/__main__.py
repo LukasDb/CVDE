@@ -6,6 +6,8 @@ import subprocess
 import json
 import importlib
 from .workspace_tools import *
+import threading
+import time
 
 
 @begin.subcommand
@@ -38,10 +40,21 @@ def init():
 
 
 @begin.subcommand
-def gui():
+def gui(port='8501'):
     "Run CVDE GUI in your browser"
-    gui_file = os.path.join(os.path.dirname(__file__), "gui.py")
-    proc = subprocess.Popen(["streamlit", "run", gui_file])
+    gui_file = os.path.join(os.path.dirname(__file__), 'gui.py')
+    proc = subprocess.Popen(["streamlit", "run", gui_file, "--server.runOnSave", "true", "--server.port", port])
+
+    def refresher():
+        path = os.path.join(os.path.dirname(__file__), 'lib', 'refresher.py')
+        while True:
+            print("REFRESHED")
+            time.sleep(5)
+            with open(path, 'w') as F:
+                F.write(f"# {time.time()}")
+    t = threading.Thread(target=refresher, daemon=True)
+    t.start()
+
     try:
         while proc.poll() is None:
             logging.info(proc.communicate(1.0))
