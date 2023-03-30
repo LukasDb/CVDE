@@ -33,3 +33,31 @@ def generate_template(type, name):
 
     with open(os.path.join(type, name + suffix), "w") as F:
         F.write(templates[type])
+
+
+def write_vs_launch_file():
+    try:
+        os.makedirs('.vscode')
+    except FileExistsError:
+        pass
+
+    launch_file = os.path.join('.vscode', 'launch.json')
+    if os.path.isfile(launch_file):
+        with open(launch_file) as F:
+            launch = json.load(F)
+    else:
+        launch = {"version": "0.2.0", "configurations": []}
+
+    launch["configurations"].append({
+        "name": "Launch GUI",
+                "type": "python",
+                "request": "launch",
+                "module": "cvde",
+                "args": [
+                    "gui"
+                ],
+        "justMyCode": True
+    })
+
+    with open(launch_file, 'w') as F:
+        json.dump(launch, F, indent='\t')

@@ -3,7 +3,7 @@ import os
 import logging
 import importlib
 from datetime import datetime
-from .templates import generate_template
+from .templates import generate_template, write_vs_launch_file
 
 
 class WS_Settings:
@@ -97,8 +97,11 @@ def init_workspace():
             F.write('')
 
     date = datetime.now().strftime('%Y-%m-%d')
-    ws = {'created': date}
+    ws = {'created': date, 'models': [],
+          'datasets': [], 'configs': [], 'tasks': []}
     WS_Settings().update(ws)
+
+    write_vs_launch_file()
 
 
 def create(type, name):
