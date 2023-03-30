@@ -4,6 +4,8 @@ import logging
 import importlib
 from datetime import datetime
 from .templates import generate_template, write_vs_launch_file
+import sys
+sys.path.append(os.getcwd())
 
 
 class WS_Settings:
@@ -50,8 +52,9 @@ def load_config(config_name):
 
 def load_dataset(data_name, data_config):
     module = importlib.import_module(
-        f".datasets.{data_name}", package=os.getcwd().split('/')[-1])
+        f"datasets.{data_name}")
     importlib.reload(module)
+
     train_set = module.get_dataloader(**data_config)
     return train_set
 

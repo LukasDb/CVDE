@@ -1,4 +1,5 @@
 from setuptools import setup
+import cvde
 
 setup(
     name='cvde',
@@ -9,7 +10,9 @@ setup(
     author_email='lukas.dirnberger@tum.de',
     license='todo',
     packages=['cvde'],
-    install_requires=['streamlit', 'streamlit-on-Hover-tabs', 'begins', 'opencv-python'],
+    install_requires=['streamlit', 'streamlit-on-Hover-tabs', 'click', 'opencv-python'],
+
+    entry_points=cvde.__entry_points__,
 
     classifiers=[
         'Development Status :: 1 - Planning',

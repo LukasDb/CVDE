@@ -1,17 +1,24 @@
 import logging
 import sys
 import os
-import begin
 import subprocess
 import json
 import importlib
 from .workspace_tools import *
 import threading
 import time
+import click
 
+@click.group()
+def run():
+    "Computer Vision Development Enviroment"
+    pass
 
-@begin.subcommand
-def execute(task: 'which task to run', config: 'which config to pass to task'):
+@run.command()
+@click.argument('task')
+@click.argument('config')
+def execute(task, config):
+    "Execute a given task with a configuration"
     config = load_config(config)
 
     model = importlib.import_module(
@@ -26,21 +33,23 @@ def execute(task: 'which task to run', config: 'which config to pass to task'):
                      val_set=val_set, **config['task_config'])
 
 
-@begin.subcommand
-def create(type: 'datasets | models | tasks | configs', name: 'Unique name of dataloader'):
-    "Create a data_loader, model or task"
+@run.command()
+@click.argument('type')
+@click.argument('name')
+def create(type, name):
+    "Create a new module of type {data|model|config|task}"
     create(type, name)
 
 
-
-@begin.subcommand
+@run.command()
 def init():
     "Create an empty workspace"
     init_workspace()
 
 
-@begin.subcommand
-def gui(port='8501'):
+@run.command()
+@click.option('-p', '--port', default='8501', help='Port to access the GUI', show_default=True)
+def gui(port):
     "Run CVDE GUI in your browser"
     gui_file = os.path.join(os.path.dirname(__file__), 'gui.py')
     proc = subprocess.Popen(["streamlit", "run", gui_file, "--server.runOnSave", "true", "--server.port", port])
@@ -48,7 +57,6 @@ def gui(port='8501'):
     def refresher():
         path = os.path.join(os.path.dirname(__file__), 'lib', 'refresher.py')
         while True:
-            print("REFRESHED")
             time.sleep(5)
             with open(path, 'w') as F:
                 F.write(f"# {time.time()}")
@@ -64,19 +72,5 @@ def gui(port='8501'):
     finally:
         proc.kill()
 
-@begin.subcommand
 def summary():
     print(get_ws_summary())
-
-
-try:
-    @begin.start
-    @begin.logging
-    def run():
-        "Computer Vision Development Enviroment"
-        pass
-
-except TypeError:
-    # HACK surpress printing from begins library (only in this main func)
-    pass
-    
