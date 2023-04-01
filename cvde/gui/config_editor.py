@@ -20,7 +20,6 @@ class ConfigEditor():
         cfg_name = st.selectbox("Configuration", options=WS().configs)
         config = load_config(cfg_name)
         modified = {}
-        st.text(f"Loading config from {cfg_name}")
         for key, conf in config.items():
             st.subheader(f"Kwargs for {key}")
             text = st_ace.st_ace(yaml.dump(conf),**self.ace_options)

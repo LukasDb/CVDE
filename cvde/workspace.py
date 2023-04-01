@@ -3,6 +3,7 @@ import yaml
 import os
 import logging
 import importlib
+from datetime import datetime
 from cvde.templates import realize_template
 
 import sys
@@ -21,6 +22,12 @@ class Workspace:
                 cls, *args, **kwargs)
         return cls._instance
     
+    def init(self, name):
+        date = datetime.now().strftime('%Y-%m-%d')
+        ws = {'name':name, 'created': date, 'models': [],
+            'datasets': [], 'configs': [], 'tasks': [], 'jobs':[]}
+        self._write(ws)
+    
     @property
     def _state(self):
         with open(".workspace.cvde") as F:
@@ -34,6 +41,10 @@ class Workspace:
     def __getitem__(self, key):
         state = self._state
         return state[key]
+    
+    @property
+    def name(self):
+        return self['name']
     
     @property
     def jobs(self):
@@ -82,7 +93,7 @@ class Workspace:
         state = self._state
         if type=='jobs':
             if job is None:
-                raise NotImplementedError("default job")
+                job = {'Task':'None', 'Model':'None', 'Config':'None', 'Model':'None', 'Train Dataset':'None', 'Val Dataset':'None'}
             state[type].update({name:job})
         else:
             state[type].append(name)

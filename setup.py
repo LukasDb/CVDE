@@ -10,7 +10,7 @@ setup(
     author_email='lukas.dirnberger@tum.de',
     license='todo',
     packages=['cvde'],
-    install_requires=['streamlit', 'streamlit-on-Hover-tabs', 'click', 'opencv-python'],
+    install_requires=['streamlit', 'click', 'opencv-python'],
 
     entry_points=cvde.__entry_points__,
 

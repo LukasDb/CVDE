@@ -4,11 +4,11 @@ import os
 import subprocess
 import json
 import importlib
-from .workspace_tools import *
+from cvde.workspace_tools import *
 import threading
 import time
 import click
-from job_handler import execute_job
+from cvde.job_executor import execute_job
 
 @click.group()
 def run():
@@ -16,11 +16,15 @@ def run():
     pass
 
 @run.command()
+@click.argument('name')
 @click.argument('task')
 @click.argument('config')
-def execute(task, model, train_data, val_data, config):
+@click.argument('model')
+@click.argument('train_data')
+@click.argument('val_data')
+def execute(name, task, model, train_data, val_data, config):
     "Execute a given task"
-    execute_job(task=task, config=config, model_name=model,
+    execute_job(name, task=task, config=config, model_name=model,
                 train_ds=train_data, val_ds=val_data)
 
 
@@ -34,9 +38,10 @@ def create(type, name):
 
 
 @run.command()
-def init():
+@click.option('-n', '--name', help='Name of the workspace')
+def init(name):
     "Create an empty workspace"
-    init_workspace()
+    init_workspace(name)
 
 
 @run.command()

@@ -1,9 +1,8 @@
 from cvde.workspace import Workspace as WS
 from cvde.workspace import ModuleExistsError
-from cvde.job_handler import execute_job
+from cvde.job_executor import execute_job
 import streamlit as st
 import pandas as pd
-import threading
 
 
 class JobManager:
@@ -34,17 +33,15 @@ class JobManager:
                 self.gui_row_from_job(name, job_config)
 
     def run_job(self):
-        for name, job in self.jobs.items():
-            if st.session_state[name+'selected']:
-                args = (job['Task'], job['Config'], job['Model'], job['Train Dataset'], job['Val Dataset'])
-                t = threading.Thread(target=execute_job, args=args, daemon=True)
-                t.start()
-        self.unselect_all()
+        with st.spinner('Running tasks...'):
+            for name, job in self.jobs.items():
+                if st.session_state[name+'selected']:
+                    execute_job(name, job['Task'], job['Config'], job['Model'], job['Train Dataset'], job['Val Dataset'])
 
 
     def gui_row_from_job(self, name, job_config):
         cols = st.columns(7)
-
+    
         # TODO add multiselect for gpu
 
         if name+'selected' not in st.session_state:
@@ -109,6 +106,5 @@ class JobManager:
         self.unselect_all()
     
     def add_empty_job(self):
-        empty_job = {'Task':'None', 'Model':'None', 'Config':'None', 'Model':'None', 'Train Dataset':'None', 'Val Dataset':'None'}
-        WS().new('jobs', 'New Job', job=empty_job)
+        WS().new('jobs', 'New Job')
 

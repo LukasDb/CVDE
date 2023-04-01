@@ -2,7 +2,6 @@ import os
 import logging
 import yaml
 from cvde.workspace import Workspace as WS
-from datetime import datetime
 import importlib
 from typing import Callable
 
@@ -74,7 +73,7 @@ def get_ws_summary():
     return out
 
 
-def init_workspace():
+def init_workspace(name):
     logging.info("Creating empty workspace...")
 
     if len(os.listdir)>0:
@@ -87,7 +86,4 @@ def init_workspace():
         with open(os.path.join(folder, '__init__.py'), 'w') as F:
             F.write('')
 
-    date = datetime.now().strftime('%Y-%m-%d')
-    ws = {'created': date, 'models': [],
-          'datasets': [], 'configs': [], 'tasks': [], 'jobs':[]}
-    WS_Settings().update(ws)
+    WS().init(name)
