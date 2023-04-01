@@ -1,6 +1,7 @@
 from cvde.workspace_tools import load_config, load_dataset, load_model, load_task_fn
 from cvde.job_tracker import JobTracker
 import importlib
+import traceback
 
 
 def execute_job(name:str, task: str, config: str, model_name: str, train_ds: str, val_ds: str):
@@ -11,14 +12,17 @@ def execute_job(name:str, task: str, config: str, model_name: str, train_ds: str
     try:
         model = load_model(model_name, config["model"])
     except ModuleNotFoundError:
+        print(traceback.format_exc())
         model = None
     try:
         train_set = load_dataset(train_ds, config['train_config'])
     except ModuleNotFoundError:
+        print(traceback.format_exc())
         train_set = None
     try:
         val_set = load_dataset(val_ds, config['val_config'])
     except ModuleNotFoundError:
+        print(traceback.format_exc())
         val_set = None
     
 
