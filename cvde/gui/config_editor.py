@@ -22,7 +22,7 @@ class ConfigEditor():
         modified = {}
         for key, conf in config.items():
             st.subheader(f"Kwargs for {key}")
-            text = st_ace.st_ace(yaml.dump(conf),**self.ace_options)
+            text = st_ace.st_ace(yaml.dump(conf),**self.ace_options, key=cfg_name+key)
             modified[key] = yaml.safe_load(text)
         
         write_config(cfg_name, modified)

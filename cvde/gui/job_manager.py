@@ -3,11 +3,12 @@ from cvde.workspace import ModuleExistsError
 from cvde.job_executor import execute_job
 import streamlit as st
 import pandas as pd
+from typing import OrderedDict
 
 
 class JobManager:
     def __init__(self) -> None:
-        self.jobs = WS().jobs
+        self.jobs = OrderedDict(WS().jobs)
         self.managed = {'Task':WS().tasks,
                         'Config':WS().configs,
                         'Model':WS().models,
@@ -93,8 +94,6 @@ class JobManager:
             st.error("Job already exists! Rename previous copy to a unique name.")
 
     def duplicate_selected(self):
-        print(st.session_state)
-
         for job in self.jobs:
             if not st.session_state[job+'selected']:
                 continue
