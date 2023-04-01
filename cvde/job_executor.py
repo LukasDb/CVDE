@@ -4,8 +4,7 @@ import importlib
 
 
 def execute_job(name:str, task: str, config: str, model_name: str, train_ds: str, val_ds: str):
-    tracker = JobTracker(name, task, config, model_name, train_ds, val_ds)
-    tracker.create()
+    tracker = JobTracker.create(name, task, config, model_name, train_ds, val_ds)
 
     config = load_config(config)
     task_fn = load_task_fn(task)
