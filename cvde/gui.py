@@ -2,8 +2,6 @@ import os
 from st_on_hover_tabs import on_hover_tabs
 import streamlit as st
 
-from gui.dashboard import dashboard
-from gui.data_explorer import data_explorer
 
 
 def main():
@@ -13,25 +11,33 @@ def main():
                 'style.css')).read() + '</style>', unsafe_allow_html=True)
 
     with st.sidebar:
-        tabs = on_hover_tabs(tabName=['Dashboard', 'Data Explorer', 'Model Explorer', 'Task Manager', 'Task Tracker', 'Deployment'],
-                             iconName=['dashboard', 'images', 'model_training', 'schema', 'insights', 'construction'], default_choice=0)
+        tabs = on_hover_tabs(tabName=['Dashboard', 'Data Explorer', 'Model Explorer', 'Config Editor', 'Job Manager', 'Job Tracker', 'Deployment'],
+                             iconName=['dashboard', 'images', 'model_training', 'settings', 'schema', 'insights', 'construction'], default_choice=0)
 
     if tabs == 'Dashboard':
+        from gui.dashboard import dashboard
         dashboard()
 
     elif tabs == 'Data Explorer':
+        from gui.data_explorer import data_explorer
         data_explorer()
 
     elif tabs == 'Model Explorer':
         st.title("Model Explorer")
         st.markdown('An overview over the models in the workspace')
+    
+    elif tabs == 'Config Editor':
+        from gui.config_editor import ConfigEditor
+        ce = ConfigEditor()
+        ce.run()
 
-    elif tabs == 'Task Manager':
-        st.title("Task Manager")
-        st.markdown("Quick ways to check training, validiaton scripts")
+    elif tabs == 'Job Manager':
+        from gui.job_manager import JobManager
+        jm = JobManager()
+        jm.run()
 
-    elif tabs == "Task Tracker":
-        st.title("Task Tracker")
+    elif tabs == "Job Tracker":
+        st.title("Job Tracker")
         st.markdown(
             "Tensorboard-like tracking of training processes and keeping logs")
 

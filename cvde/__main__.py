@@ -8,6 +8,7 @@ from .workspace_tools import *
 import threading
 import time
 import click
+from job_handler import execute_job
 
 @click.group()
 def run():
@@ -17,20 +18,11 @@ def run():
 @run.command()
 @click.argument('task')
 @click.argument('config')
-def execute(task, config):
-    "Execute a given task with a configuration"
-    config = load_config(config)
+def execute(task, model, train_data, val_data, config):
+    "Execute a given task"
+    execute_job(task=task, config=config, model_name=model,
+                train_ds=train_data, val_ds=val_data)
 
-    model = importlib.import_module(
-        f"models.{config['model']}").get_model(**config['model_config'])
-    model.summary()
-
-    train_set = load_dataset(config['train_set'], config['train_data_config'])
-    val_set = load_dataset(config['val_set'], config['val_data_config'])
-
-    module_task = importlib.import_module(f"tasks.{task}")
-    module_task.main(model=model, train_set=train_set,
-                     val_set=val_set, **config['task_config'])
 
 
 @run.command()
@@ -54,14 +46,6 @@ def gui(port):
     gui_file = os.path.join(os.path.dirname(__file__), 'gui.py')
     proc = subprocess.Popen(["streamlit", "run", gui_file, "--server.runOnSave", "true", "--server.port", port])
 
-    def refresher():
-        path = os.path.join(os.path.dirname(__file__), 'lib', 'refresher.py')
-        while True:
-            time.sleep(5)
-            with open(path, 'w') as F:
-                F.write(f"# {time.time()}")
-    t = threading.Thread(target=refresher, daemon=True)
-    t.start()
 
     try:
         while proc.poll() is None:

@@ -1,9 +1,8 @@
 import streamlit as st
 import subprocess
 from datetime import datetime
-import lib.refresher
 
-from cvde.workspace_tools import get_ws_summary, create
+from cvde.workspace_tools import get_ws_summary
 
 
 def dashboard():
@@ -26,6 +25,12 @@ def dashboard():
     model_name = col2.text_input('model name')
     col3.button("+", key='model_btn',
                 on_click=lambda: create('models', model_name))
+    
+    col1, col2, col3 = st.columns((1, 2, 1))
+    col1.markdown("Add new task:")
+    task_name = col2.text_input('task name')
+    col3.button("+", key='task_btn',
+                on_click=lambda: create('tasks', task_name))
 
     st.markdown("## Workspace Overview")
     st.code(get_ws_summary())
