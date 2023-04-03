@@ -1,3 +1,4 @@
+from itertools import cycle
 import numpy as np
 import logging
 import streamlit as st
@@ -10,83 +11,168 @@ from cvde.workspace import Workspace as WS
 from cvde.workspace_tools import load_dataset, load_config, load_dataspec
 
 
-def visualize_image(handle, img):
-    img_shape = img.shape
-
-    if img.dtype == np.uint8 or img.dtype == np.uint16:
-        pass
-    else:
-        img = cv2.convertScaleAbs(img, alpha=255 / np.max(img))
-        img = cv2.applyColorMap(img, cv2.COLORMAP_JET)
-
-    h, w = img.shape[:2]
-
-    scale = max(h // 120, 1)
-    img = cv2.resize(img, (w // scale, h // scale))
-
-    handle.image(img, caption=f"Shape: {img_shape}")
-
-
 @st.cache_resource
-def get_cached_dataset(data_mod, data_config):
-    dataset = load_dataset(data_mod, data_config)
+def get_cached_dataset(data_mod, **kwargs):
+    dataset = load_dataset(data_mod, **kwargs)
+    if hasattr(dataset, '__iter__'):
+        dataset = dataset.__iter__()
     return dataset
 
-def visualize_datapoint(spec, data, handle = st):
+
+@st.cache_data
+def get_data(_dataset, data_index):
+    return next(_dataset)
+
+
+def get_vis_stack(spec, data, stacks: dict, stack_ind=0):
     if isinstance(spec, dict):
-        for k,v in spec.items():
+        for k, v in spec.items():
             if isinstance(k, str):
-                handle.write(k)
-                visualize_datapoint(v, data[k])
+                st.write(k)
+                stacks = get_vis_stack(v, data[k], stacks, stack_ind)
             else:
                 raise NotImplementedError("Dict with non string keys!")
+        return stacks
 
     elif isinstance(spec, (tuple, list)):
-        for i, (subspec, subdata) in enumerate(zip(spec, data)):
-            handle.write(i)
-            visualize_datapoint(subspec, subdata)
+        for inner_spec, inner_data in zip(spec, data):
+            stacks = get_vis_stack(
+                inner_spec, inner_data, stacks, stack_ind)
+        return stacks
+
+    elif isinstance(spec, dt.Batch):
+        for batch_n, batch_data in enumerate(data):
+            stacks.setdefault(batch_n, {})
+            stacks = get_vis_stack(
+                spec.inner_spec, batch_data, stacks, stack_ind=batch_n)
+        return stacks
 
     elif isinstance(spec, dt.Image):
         vis = spec.get_visualization(data)
-        handle.image(vis, caption=f"Shape: {data.shape}")
+        name_str = f"{spec.name}, " if spec.name is not None else ""
+        name_str += f"Shape: {data.shape}"
+        is_first_image = 'image' not in [x['type']
+                                         for x in stacks[stack_ind].values()]
 
-    elif isinstance(spec, dt.Batch):
-        cols = handle.columns(spec.batch_size)
-        for col, i in zip(cols, range(spec.batch_size)):
-            visualize_datapoint(spec.inner_spec, data[i], handle=col)
+        # only create GUI for 'first' data in batch
+        if stack_ind == 0:
+            if is_first_image:
+                st.session_state[spec.name] = 1.0
+            else:
+                st.slider(f"Overlay: {spec.name}", key=spec.name)
+
+        stacks[stack_ind].update({spec.name: {'data': vis, 'type': 'image'}})
+        return stacks
 
     elif isinstance(spec, dt.Numerical):
-        st.write(data)
+        stacks[stack_ind].update(
+            {spec.name: {'data': data, 'type': 'numerical'}})
+        if stack_ind == 0:
+            st.session_state[spec.name] = True
+        return stacks
 
+    elif isinstance(spec, dt.Bbox):
+        # only create GUI for 'first' data in batch
+        if stack_ind == 0:
+            st.checkbox(spec.name, key=spec.name)
+        stacks[stack_ind].update(
+            {spec.name: {'spec': spec, 'data': data, 'type': 'bbox'}})
+        return stacks
+
+    elif spec is None:
+        pass
     else:
         raise AssertionError('Unkonwn entry in spec: ', spec)
+
+
+def inc_data_index():
+    st.session_state.data_index += 1
+
+
+def dec_data_index():
+    st.session_state.data_index -= 1
+
+
+def reset():
+    st.cache_resource.clear()
+    st.cache_data.clear()
+    st.session_state.data_index = 0
 
 
 def data_explorer():
     st.title("Data Explorer")
 
+    if 'data_index' not in st.session_state:
+        st.session_state['data_index'] = 0
+    if 'max_data' not in st.session_state:
+        st.session_state['max_data'] = 1
+
     data_loaders = WS().datasets
     configs = WS().configs
     # build data viewer
     col1, col2, col3 = st.columns(3)
-    data_mod = col1.selectbox('Data source', data_loaders)
-    config_name = col2.selectbox('Config', configs)
-    is_val = col3.checkbox('Use val_data_config')
+    dataset_name = col1.selectbox('Data source', data_loaders, on_change=reset)
+    config_name = col2.selectbox('Config', configs, on_change=reset)
+    is_val = col3.checkbox('Use val_data_config', on_change=reset)
 
     # reloads page, progresses through iterable dataset
-    buttons = col3.columns(2)
-    buttons[0].button("Next")
-    # reset dataset to 0
-    buttons[1].button("Reset", on_click=lambda: st.cache_resource.clear())
+    buttons = col3.columns(3)
+    buttons[0].button("Prev", on_click=dec_data_index)
+    buttons[1].button("Next", on_click=inc_data_index)
+    buttons[2].button("Reset", on_click=reset)
 
     config = load_config(config_name)
     key = 'val_config' if is_val else 'train_config'
     data_config = config[key]
 
-    with st.spinner("Loading data..."):
-        dataset = get_cached_dataset(data_mod, data_config)
-        data_spec = load_dataspec(data_mod, data_config) 
 
-        for i, d in enumerate(dataset):
-            visualize_datapoint(data_spec, d)
-            break
+    with st.spinner("Loading data..."):
+        # Loading spec and cached data
+        dataset = get_cached_dataset(
+            dataset_name, **data_config, **config['shared'])
+        data_spec = load_dataspec(
+            dataset_name, **data_config, **config['shared'])
+        data = get_data(dataset, int(st.session_state.data_index))
+
+        # build settings and assemble organized visualizations
+        with st.sidebar:
+            st.subheader('Settings')
+            stacks = {0: {}}
+            stacks = get_vis_stack(data_spec, data, stacks=stacks)
+
+    # visualizing the data
+
+    st.subheader(f"#{st.session_state.data_index}")
+
+    cols = st.columns(2)
+    for stack, col in zip(stacks.values(), cycle(cols)):
+        image_data = None
+        captions = []
+        with col:
+            for name, data in stack.items():
+                if not st.session_state[name]:
+                    continue
+
+                if data['type'] == 'image':
+                    if image_data is None:
+                        image_data = data['data']
+                        captions.append(f"Shape: {image_data.shape}")
+                    else:
+                        α = st.session_state[name] / 100.
+                        image_data = cv2.addWeighted(
+                            image_data, 1 - α, data['data'], α, 0)
+                    captions.append(name)
+
+                elif data['type'] == 'bbox':
+                    image_data = data['spec'].draw_bbox_on(
+                        data['data'], image_data)
+                    captions.append(name)
+
+                elif data['type'] == 'numerical':
+                    num = data['data']
+                    if hasattr(num, 'numpy'):
+                        num = num.numpy()
+                    st.text(f"{name}: {num}")
+
+            if image_data is not None:
+                st.image(image_data, caption=" - ".join(captions))

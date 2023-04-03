@@ -1,18 +1,17 @@
-import streamlit as st
 from .data_type import DataType
 import numpy as np
 
 
 class Image(DataType):
-    def __init__(self, shape: tuple, format: str, decode=None) -> None:
+    def __init__(self, shape: tuple, format: str, decode=None, **kwargs) -> None:
         """ Specify Image Datatype. Specify format (CHW, HWC..) to mark height,
         width and channel dimension. Optionally provide a decode function to 
         retrieve a visualization of the image.
         If the decode function changes the shape, modify shape and format accordingly"""
+        super().__init__(**kwargs)
         self.shape = shape
         self.format = format.lower()
         self.decode = decode
-        super().__init__()
 
     def get_visualization(self, data) -> np.ndarray:
         if hasattr(data, 'numpy'):

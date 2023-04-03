@@ -10,7 +10,7 @@ setup(
     author_email='lukas.dirnberger@tum.de',
     license='todo',
     packages=['cvde'],
-    install_requires=['streamlit', 'click', 'opencv-python'],
+    install_requires=['streamlit', 'click', 'opencv-python', 'plotbbox'],
 
     entry_points=cvde.__entry_points__,
 
