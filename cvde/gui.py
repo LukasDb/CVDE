@@ -2,6 +2,9 @@ import os
 from st_on_hover_tabs import on_hover_tabs
 import streamlit as st
 
+import tensorflow as tf
+for dev in tf.config.list_physical_devices('GPU'):
+    tf.config.experimental.set_memory_growth(dev, True)
 
 def main():
     st.set_page_config(layout="wide")

@@ -10,6 +10,10 @@ import time
 import click
 from cvde.job_executor import execute_job
 
+import tensorflow as tf
+for dev in tf.config.list_physical_devices('GPU'):
+    tf.config.experimental.set_memory_growth(dev, True)
+
 @click.group()
 def run():
     "Computer Vision Development Enviroment"
@@ -22,9 +26,9 @@ def run():
 @click.argument('model')
 @click.argument('train_data')
 @click.argument('val_data')
-def execute(name, task, model, train_data, val_data, config):
+def execute(name, task, config, model, train_data, val_data):
     "Execute a given task"
-    execute_job(name, task=task, config=config, model_name=model,
+    execute_job(name, task=task, config_name=config, model_name=model,
                 train_ds=train_data, val_ds=val_data)
 
 

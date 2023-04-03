@@ -21,7 +21,6 @@ def execute_job(name: str, task: str, config_name: str, model_name: str, train_d
         print(traceback.format_exc())
         model = None
     try:
-        print(config)
         train_set = load_dataset(
             train_ds, **config['train_config'], **config["shared"])
     except ModuleNotFoundError:

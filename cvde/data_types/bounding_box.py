@@ -8,16 +8,13 @@ from plotbbox import plotBBox
 
 class Bbox(DataType):
     def __init__(self, format: str = 'x1,y1,x2,y2,cls', relative: bool = False, labelmap: Dict[int, str] = None, colormap: Mapping = None, **kwargs) -> None:
-        """ Specifies a bounding box.
+        """Specify a (list of ) bounding box
 
-        Parameters:
-            format (str): Define bounding box format. Examples:
-                            (min_x, min_y, max_x, max_y) == 'x1,y1,x2,y2'
-                            [(center_x, center_y, width, height)] as '[x,y,w,h]'
-            relative (bool): If bounding box is normalized to image dimensions [0, 1]
-            colormap: Can used to map 'cls' to a BGR color
-            labelmap: Can be used to map 'cls' to a readable string
-
+        Args:
+            format (str, optional): Format of Bounding Box. (x1 for min_x, x for center_x, w for width). Use e.g.[xywh] for a list of boxes. Defaults to 'x1,y1,x2,y2,cls'.
+            relative (bool, optional): If bounding box is in relative [0, 1] coordinates instead of pixels. Defaults to False.
+            labelmap (Dict[int, str], optional): Maps 'cls' to readable string. Defaults to None.
+            colormap (Mapping, optional): Maps 'cls' to a color. Defaults to None.
         """
         super().__init__(**kwargs)
         self.relative = relative

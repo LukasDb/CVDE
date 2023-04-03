@@ -1,3 +1,4 @@
+import subprocess
 from cvde.workspace import Workspace as WS
 from cvde.workspace import ModuleExistsError
 from cvde.job_executor import execute_job
@@ -9,23 +10,22 @@ from typing import OrderedDict
 class JobManager:
     def __init__(self) -> None:
         self.jobs = OrderedDict(WS().jobs)
-        self.managed = {'Task':WS().tasks,
-                        'Config':WS().configs,
-                        'Model':WS().models,
-                        'Train Dataset':WS().datasets,
-                        'Val Dataset':WS().datasets}
+        self.managed = {'Task': WS().tasks,
+                        'Config': WS().configs,
+                        'Model': WS().models,
+                        'Train Dataset': WS().datasets,
+                        'Val Dataset': WS().datasets}
 
         for v in self.managed.values():
             v.append('None')
 
-
     def run(self):
         buttons = st.columns(4)
         buttons[0].button("Add Job", on_click=self.add_empty_job)
-        buttons[1].button("Duplicate Selected", on_click=self.duplicate_selected)
+        buttons[1].button("Duplicate Selected",
+                          on_click=self.duplicate_selected)
         buttons[2].button("Delete Selected", on_click=self.delete_jobs)
         buttons[3].button("Launch Selected", on_click=self.run_job)
-
 
         rows, = st.columns(1)
         with rows:
@@ -35,28 +35,32 @@ class JobManager:
     def run_job(self):
         with st.spinner('Running tasks...'):
             for name, job in self.jobs.items():
-                if st.session_state[name+'selected']:
-                    execute_job(name, job['Task'], job['Config'], job['Model'], job['Train Dataset'], job['Val Dataset'])
-
+                if st.session_state[name + 'selected']:
+                    st.session_state[name + 'proc'] = \
+                        subprocess.Popen(["cvde", "execute", name, job['Task'], job['Config'], job['Model'],
+                                          job['Train Dataset'], job['Val Dataset']])
 
     def gui_row_from_job(self, name, job_config):
         cols = st.columns(7)
-    
+
         # TODO add multiselect for gpu
 
-        if name+'selected' not in st.session_state:
-            st.session_state[name+'selected'] = False
-        
-        cols[0].checkbox("Select job", key=name+'selected', label_visibility="hidden")
-        cols[1].text_input("Job", value=name, key=name+'name', on_change=self.change_name, args=(name,))
+        if name + 'selected' not in st.session_state:
+            st.session_state[name + 'selected'] = False
+
+        cols[0].checkbox("Select job", key=name + 'selected',
+                         label_visibility="hidden")
+        cols[1].text_input("Job", value=name, key=name +
+                           'name', on_change=self.change_name, args=(name,))
 
         def selectbox_for_type(handle, key):
             options = self.managed[key]
             default_chosen = job_config[key]
 
-            st.session_state[name+'__'+key] = default_chosen
-            handle.selectbox(key, options, key=name+'__'+key, on_change=self.update_config, args=(name,key))
-        
+            st.session_state[name + '__' + key] = default_chosen
+            handle.selectbox(key, options, key=name + '__' + key,
+                             on_change=self.update_config, args=(name, key))
+
         selectbox_for_type(cols[2], 'Task')
         selectbox_for_type(cols[3], 'Config')
         selectbox_for_type(cols[4], 'Model')
@@ -65,11 +69,11 @@ class JobManager:
 
     def unselect_all(self):
         for job in self.jobs:
-            st.session_state[job+'selected'] = False
+            st.session_state[job + 'selected'] = False
 
     def delete_jobs(self):
         for job in self.jobs:
-            if st.session_state[job+'selected']:
+            if st.session_state[job + 'selected']:
                 self.delete_job(job)
         self.unselect_all()
 
@@ -78,14 +82,14 @@ class JobManager:
 
     def update_config(self, name, type):
         new_job_config = self.jobs[name]
-        val = st.session_state[name+'__'+type]
+        val = st.session_state[name + '__' + type]
         new_job_config[type] = val
         self.delete_job(name)
         WS().new('jobs', name, job=new_job_config)
 
     def change_name(self, name):
         job = self.jobs[name]
-        new_name = st.session_state[name+'name']
+        new_name = st.session_state[name + 'name']
         try:
             WS().new('jobs', new_name, job=job)
             self.delete_job(name)
@@ -94,15 +98,15 @@ class JobManager:
 
     def duplicate_selected(self):
         for job in self.jobs:
-            if not st.session_state[job+'selected']:
+            if not st.session_state[job + 'selected']:
                 continue
 
             try:
-                WS().new('jobs', job+'_copy', job=self.jobs[job])
+                WS().new('jobs', job + '_copy', job=self.jobs[job])
             except ModuleExistsError:
-                st.error("Job already exists! Rename previous copy to a unique name.")
+                st.error(
+                    "Job already exists! Rename previous copy to a unique name.")
         self.unselect_all()
-    
+
     def add_empty_job(self):
         WS().new('jobs', 'New Job')
-
