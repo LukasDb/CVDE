@@ -20,7 +20,6 @@ class JobManager:
 
 
     def run(self):
-        st.title("Job Manager")
         buttons = st.columns(4)
         buttons[0].button("Add Job", on_click=self.add_empty_job)
         buttons[1].button("Duplicate Selected", on_click=self.duplicate_selected)

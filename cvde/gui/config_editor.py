@@ -16,12 +16,11 @@ class ConfigEditor():
 
 
     def run(self):
-        st.title("Config Editor")
         cfg_name = st.selectbox("Configuration", options=WS().configs)
         config = load_config(cfg_name)
         modified = {}
         for key, conf in config.items():
-            st.subheader(f"Kwargs for {key}")
+            st.subheader(f"Kwargs ({key})")
             text = st_ace.st_ace(yaml.dump(conf),**self.ace_options, key=cfg_name+key)
             modified[key] = yaml.safe_load(text)
         

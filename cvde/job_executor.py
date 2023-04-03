@@ -4,27 +4,36 @@ import importlib
 import traceback
 
 
-def execute_job(name:str, task: str, config: str, model_name: str, train_ds: str, val_ds: str):
-    tracker = JobTracker.create(name, task, config, model_name, train_ds, val_ds)
+def execute_job(name: str, task: str, config_name: str, model_name: str, train_ds: str, val_ds: str):
+    tracker = JobTracker.create(
+        name, task, config_name, model_name, train_ds, val_ds)
+    
+    config = load_config(config_name)
 
-    config = load_config(config)
+    for key in ['task', 'model', 'shared', 'train_config', 'val_config']:
+        if config[key] is None:
+            config[key] = {}
+
     task_fn = load_task_fn(task)
     try:
-        model = load_model(model_name, config["model"])
+        model = load_model(model_name, **config["model"], **config["shared"])
     except ModuleNotFoundError:
         print(traceback.format_exc())
         model = None
     try:
-        train_set = load_dataset(train_ds, config['train_config'])
+        print(config)
+        train_set = load_dataset(
+            train_ds, **config['train_config'], **config["shared"])
     except ModuleNotFoundError:
         print(traceback.format_exc())
         train_set = None
     try:
-        val_set = load_dataset(val_ds, config['val_config'])
+        val_set = load_dataset(
+            val_ds, **config['val_config'], **config["shared"])
     except ModuleNotFoundError:
         print(traceback.format_exc())
         val_set = None
-    
 
-    task_fn(tracker, model=model, train_set=train_set,
-                     val_set=val_set, **config['task'])
+    with tracker:
+        task_fn(tracker, model=model, train_set=train_set,
+                val_set=val_set, **config['task'], **config["shared"])

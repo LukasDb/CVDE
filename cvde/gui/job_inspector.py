@@ -10,13 +10,15 @@ import plotly.express as px
 
 class JobInspector:
     def __init__(self) -> None:
-        self.runs = os.listdir('log')
+        try:
+            self.runs = os.listdir('log')
+        except FileNotFoundError:
+            self.runs = []
+        st.subheader("Runs")
+        st.info("No runs found.")
         self.trackers = [JobTracker.from_log(run) for run in self.runs]
 
     def run(self):
-        st.title("Job Tracker")
-
-
         vars = {}
         # load data
         with st.sidebar:
@@ -24,34 +26,34 @@ class JobInspector:
             use_time = st.checkbox("Use actual time")
             st.subheader("Logged runs")
 
-    
         for tracker in self.trackers:
             unique_name = f"{tracker.name} ({tracker.started})"
             with st.sidebar:
                 if not st.checkbox(unique_name, key=tracker.folder_name):
                     continue
-            #st.info(f"{run} tracked")
+            # st.info(f"{run} tracked")
             for var in tracker.vars:
                 vars.setdefault(var, {})
                 vars[var][unique_name] = tracker.read_var(var)
-        
+
         # display data
-        st.subheader("Runs")
         for var_name, data in vars.items():
             fig = go.Figure()
             for unique_name, run_data in data.items():
                 key = 't' if use_time else 'index'
                 x_data = np.array([x[key] for x in run_data])
                 y_data = np.array([x['data'].numpy() for x in run_data])
-                #fig = px.line(x=x_data, y=y_data)
-                fig.add_scatter(x=x_data,y=y_data, name=unique_name, showlegend=True)
+                # fig = px.line(x=x_data, y=y_data)
+                fig.add_scatter(x=x_data, y=y_data,
+                                name=unique_name, showlegend=True)
 
             with st.expander(var_name):
                 st.plotly_chart(fig)
 
         with st.expander("Config"):
-            selected_trackers = [t for t in self.trackers if st.session_state[t.folder_name]]
-            if len(selected_trackers)==0:
+            selected_trackers = [
+                t for t in self.trackers if st.session_state[t.folder_name]]
+            if len(selected_trackers) == 0:
                 return
             cols = st.columns(len(selected_trackers))
             for col, tracker in zip(cols, selected_trackers):

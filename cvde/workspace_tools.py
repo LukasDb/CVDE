@@ -1,3 +1,4 @@
+from typing import Dict
 import os
 import logging
 import yaml
@@ -6,7 +7,7 @@ import importlib
 from typing import Callable
 
 
-def load_task_fn(task_name)->Callable:
+def load_task_fn(task_name) -> Callable:
     module_task = importlib.import_module(f"tasks.{task_name}")
     importlib.reload(module_task)
     return module_task.main
@@ -14,33 +15,42 @@ def load_task_fn(task_name)->Callable:
 
 def load_config(config_name):
     with open(os.path.join('configs', config_name + '.yml')) as F:
-        data = yaml.safe_load(F)
-    return data
+        config: Dict = yaml.safe_load(F)
+
+    for key in ['shared', 'task', 'model', 'train_config', 'val_config']:
+        if config[key] is None:
+            config[key] = {}
+    return config
+
 
 def write_config(config_name, config):
     with open(os.path.join('configs', config_name + '.yml'), 'w') as F:
         yaml.dump(config, F)
 
-def load_dataset(data_name, data_config):
+
+def load_dataset(__dataset_name, **kwargs):
     module = importlib.import_module(
-        f"datasets.{data_name}")
+        f"datasets.{__dataset_name}")
     importlib.reload(module)
-    dataset = module.get_dataloader(**data_config)
+    dataset = module.get_dataloader(**kwargs)
     return dataset
 
-def load_dataspec(data_name, data_config):
+
+def load_dataspec(__data_name, **kwargs):
     module = importlib.import_module(
-        f"datasets.{data_name}")
+        f"datasets.{__data_name}")
     importlib.reload(module)
-    spec = module.get_dataspec(**data_config)
+    spec = module.get_dataspec(**kwargs)
     return spec
 
-def load_model(model_name, config):
+
+def load_model(__model_name, **kwargs):
     module = importlib.import_module(
-        f"models.{model_name}")
+        f"models.{__model_name}")
     importlib.reload(module)
-    model = module.get_model(**config)
+    model = module.get_model(**kwargs)
     return model
+
 
 def get_ws_summary():
     # print summary of workspace
@@ -76,7 +86,7 @@ def get_ws_summary():
 def init_workspace(name):
     logging.info("Creating empty workspace...")
 
-    if len(os.listdir)>0:
+    if len(os.listdir) > 0:
         logging.error("Workspace is not empty!")
         exit(-1)
 

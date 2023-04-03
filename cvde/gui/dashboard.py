@@ -7,8 +7,6 @@ from cvde.workspace_tools import get_ws_summary
 
 
 def dashboard():
-    st.markdown("# Dashboard")
-
     col1, col2, col3 = st.columns((1, 2, 1))
     col1.markdown("Add new dataset:")
     dataset_name = col2.text_input('dataset name')

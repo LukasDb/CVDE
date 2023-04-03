@@ -21,6 +21,7 @@ def main():
 
     sel_p = st.session_state['selected_page']
     if sel_p == 'Dashboard':
+        st.title('Dashboard')
         from cvde.gui.dashboard import dashboard
         dashboard()
 
@@ -33,16 +34,19 @@ def main():
         st.markdown('An overview over the models in the workspace')
     
     elif sel_p == 'Config Editor':
+        st.title('Config Editor')
         from cvde.gui.config_editor import ConfigEditor
         ce = ConfigEditor()
         ce.run()
 
     elif sel_p == 'Job Manager':
+        st.title('Job Manager')
         from cvde.gui.job_manager import JobManager
         jm = JobManager()
         jm.run()
 
     elif sel_p == "Inspector":
+        st.title("Inspector")
         from cvde.gui.job_inspector import JobInspector
         jt = JobInspector()
         jt.run()
