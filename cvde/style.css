@@ -1,0 +1,23 @@
+/* streamlit hamburger */
+/*
+.css-1avcm0n.e8zbici2 {
+    visibility: hidden;
+}
+*/
+
+/* page header */
+.block-container.css-z5fcl4.egzxvld4 {
+    padding-top: 15px;
+}
+
+
+footer {
+    visibility: hidden;
+}
+
+
+
+/* tab buttons*/
+[data-testid="stHorizontalBlock"]:has(div.PortMarker) div.stButton > button:first-child {
+    border: none;
+}

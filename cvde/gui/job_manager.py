@@ -33,33 +33,33 @@ class JobManager:
                 self.gui_row_from_job(name, job_config)
 
     def run_job(self):
-        with st.spinner('Running tasks...'):
-            for name, job in self.jobs.items():
-                if st.session_state[name + 'selected']:
-                    st.session_state[name + 'proc'] = \
-                        subprocess.Popen(["cvde", "execute", name, job['Task'], job['Config'], job['Model'],
-                                          job['Train Dataset'], job['Val Dataset']])
+        for name, job in self.jobs.items():
+            if st.session_state[name + 'selected']:
+                subprocess.Popen(["cvde", "execute", name, job['Task'], job['Config'], job['Model'],
+                                        job['Train Dataset'], job['Val Dataset']])
+                st.info(f"Job {name} launched.")
+
 
     def gui_row_from_job(self, name, job_config):
-        cols = st.columns(7)
+        cols=st.columns(7)
 
         # TODO add multiselect for gpu
 
         if name + 'selected' not in st.session_state:
-            st.session_state[name + 'selected'] = False
+            st.session_state[name + 'selected']=False
 
-        cols[0].checkbox("Select job", key=name + 'selected',
-                         label_visibility="hidden")
-        cols[1].text_input("Job", value=name, key=name +
-                           'name', on_change=self.change_name, args=(name,))
+        cols[0].checkbox("Select job", key = name + 'selected',
+                         label_visibility = "hidden")
+        cols[1].text_input("Job", value = name, key = name +
+                           'name', on_change = self.change_name, args = (name,))
 
         def selectbox_for_type(handle, key):
-            options = self.managed[key]
-            default_chosen = job_config[key]
+            options=self.managed[key]
+            default_chosen=job_config[key]
 
-            st.session_state[name + '__' + key] = default_chosen
-            handle.selectbox(key, options, key=name + '__' + key,
-                             on_change=self.update_config, args=(name, key))
+            st.session_state[name + '__' + key]=default_chosen
+            handle.selectbox(key, options, key = name + '__' + key,
+                             on_change = self.update_config, args = (name, key))
 
         selectbox_for_type(cols[2], 'Task')
         selectbox_for_type(cols[3], 'Config')
@@ -69,7 +69,7 @@ class JobManager:
 
     def unselect_all(self):
         for job in self.jobs:
-            st.session_state[job + 'selected'] = False
+            st.session_state[job + 'selected']=False
 
     def delete_jobs(self):
         for job in self.jobs:
@@ -81,17 +81,17 @@ class JobManager:
         WS().delete('jobs', job_name)
 
     def update_config(self, name, type):
-        new_job_config = self.jobs[name]
-        val = st.session_state[name + '__' + type]
-        new_job_config[type] = val
+        new_job_config=self.jobs[name]
+        val=st.session_state[name + '__' + type]
+        new_job_config[type]=val
         self.delete_job(name)
-        WS().new('jobs', name, job=new_job_config)
+        WS().new('jobs', name, job = new_job_config)
 
     def change_name(self, name):
-        job = self.jobs[name]
-        new_name = st.session_state[name + 'name']
+        job=self.jobs[name]
+        new_name=st.session_state[name + 'name']
         try:
-            WS().new('jobs', new_name, job=job)
+            WS().new('jobs', new_name, job = job)
             self.delete_job(name)
         except ModuleExistsError:
             st.error("Job already exists! Rename previous copy to a unique name.")
@@ -102,7 +102,7 @@ class JobManager:
                 continue
 
             try:
-                WS().new('jobs', job + '_copy', job=self.jobs[job])
+                WS().new('jobs', job + '_copy', job = self.jobs[job])
             except ModuleExistsError:
                 st.error(
                     "Job already exists! Rename previous copy to a unique name.")

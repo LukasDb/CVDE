@@ -10,14 +10,12 @@ import time
 import click
 from cvde.job_executor import execute_job
 
-import tensorflow as tf
-for dev in tf.config.list_physical_devices('GPU'):
-    tf.config.experimental.set_memory_growth(dev, True)
 
 @click.group()
 def run():
     "Computer Vision Development Enviroment"
     pass
+
 
 @run.command()
 @click.argument('name')
@@ -30,7 +28,6 @@ def execute(name, task, config, model, train_data, val_data):
     "Execute a given task"
     execute_job(name, task=task, config_name=config, model_name=model,
                 train_ds=train_data, val_ds=val_data)
-
 
 
 @run.command()
@@ -53,8 +50,8 @@ def init(name):
 def gui(port):
     "Run CVDE GUI in your browser"
     gui_file = os.path.join(os.path.dirname(__file__), 'gui.py')
-    proc = subprocess.Popen(["streamlit", "run", gui_file, "--server.runOnSave", "true", "--server.port", port])
-
+    proc = subprocess.Popen(["streamlit", "run", gui_file,
+                            "--server.runOnSave", "true", "--server.port", port])
 
     try:
         while proc.poll() is None:
@@ -64,6 +61,7 @@ def gui(port):
         logging.warning("User interrupted.")
     finally:
         proc.kill()
+
 
 def summary():
     print(get_ws_summary())

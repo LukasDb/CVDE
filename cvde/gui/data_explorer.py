@@ -1,3 +1,4 @@
+import traceback
 from itertools import cycle
 import numpy as np
 import logging
@@ -24,12 +25,13 @@ def get_data(_dataset, data_index):
     return next(_dataset)
 
 
-def get_vis_stack(spec, data, stacks: dict, stack_ind=0):
+def get_vis_stack(spec, data, stacks: dict, batch_ind=0):
+    """ walks through data_spec and builds settings gui as well as assembling a stack of correlated data"""
     if isinstance(spec, dict):
         for k, v in spec.items():
             if isinstance(k, str):
                 st.write(k)
-                stacks = get_vis_stack(v, data[k], stacks, stack_ind)
+                stacks = get_vis_stack(v, data[k], stacks, batch_ind)
             else:
                 raise NotImplementedError("Dict with non string keys!")
         return stacks
@@ -37,14 +39,14 @@ def get_vis_stack(spec, data, stacks: dict, stack_ind=0):
     elif isinstance(spec, (tuple, list)):
         for inner_spec, inner_data in zip(spec, data):
             stacks = get_vis_stack(
-                inner_spec, inner_data, stacks, stack_ind)
+                inner_spec, inner_data, stacks, batch_ind)
         return stacks
 
     elif isinstance(spec, dt.Batch):
         for batch_n, batch_data in enumerate(data):
             stacks.setdefault(batch_n, {})
             stacks = get_vis_stack(
-                spec.inner_spec, batch_data, stacks, stack_ind=batch_n)
+                spec.inner_spec, batch_data, stacks, batch_ind=batch_n)
         return stacks
 
     elif isinstance(spec, dt.Image):
@@ -52,30 +54,29 @@ def get_vis_stack(spec, data, stacks: dict, stack_ind=0):
         name_str = f"{spec.name}, " if spec.name is not None else ""
         name_str += f"Shape: {data.shape}"
         is_first_image = 'image' not in [x['type']
-                                         for x in stacks[stack_ind].values()]
+                                         for x in stacks[batch_ind].values()]
 
         # only create GUI for 'first' data in batch
-        if stack_ind == 0:
+        if batch_ind == 0:
             if is_first_image:
                 st.session_state[spec.name] = 1.0
             else:
                 st.slider(f"Overlay: {spec.name}", key=spec.name)
 
-        stacks[stack_ind].update({spec.name: {'data': vis, 'type': 'image'}})
+        stacks[batch_ind].update({spec.name: {'data': vis, 'type': 'image'}})
         return stacks
 
     elif isinstance(spec, dt.Numerical):
-        stacks[stack_ind].update(
+        stacks[batch_ind].update(
             {spec.name: {'data': data, 'type': 'numerical'}})
-        if stack_ind == 0:
+        if batch_ind == 0:
             st.session_state[spec.name] = True
         return stacks
 
     elif isinstance(spec, dt.Bbox):
-        # only create GUI for 'first' data in batch
-        if stack_ind == 0:
+        if batch_ind == 0:
             st.checkbox(spec.name, key=spec.name)
-        stacks[stack_ind].update(
+        stacks[batch_ind].update(
             {spec.name: {'spec': spec, 'data': data, 'type': 'bbox'}})
         return stacks
 
@@ -134,11 +135,27 @@ def data_explorer():
             dataset_name, **data_config, **config['shared'])
         data = get_data(dataset, int(st.session_state.data_index))
 
-        # build settings and assemble organized visualizations
-        with st.sidebar:
-            st.subheader('Settings')
-            stacks = {0: {}}
+    # build settings and assemble organized visualizations
+    with st.sidebar:
+        st.subheader('Settings')
+
+        stacks = {0: {}}
+        try:
             stacks = get_vis_stack(data_spec, data, stacks=stacks)
+        except Exception:
+            st.error('Is your dataspec correct?')
+            def get_shape(x):
+                if hasattr(x, 'shape'):
+                    return x.shape
+                elif isinstance(x, (list, tuple)):
+                    return [get_shape(i) for i in x]
+                elif isinstance(x, dict):
+                    return {k:get_shape(v) for k,v in x.items()}
+                else:
+                    return x
+            data_shape = get_shape(data)
+            st.error(f"Received: {data_shape}")
+
 
     # visualizing the data
 
