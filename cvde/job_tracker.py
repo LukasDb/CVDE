@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 import sys
 from typing import Any, List
+import shutil
 
 # TODO this needs refactoring
 
@@ -49,7 +50,14 @@ class JobTracker:
         tracker.tags = meta['tags']
         tracker.root = os.path.join("log", tracker.folder_name)
         tracker.var_root = os.path.join(tracker.root, 'vars')
+        tracker.weights_root = os.path.join(tracker.root, 'weights')
+
         return tracker
+
+    @property
+    def unique_name(self):
+        in_progress = '🔴 ' if self.in_progress else ""
+        return f"{in_progress}{self.name} ({self.started})"
 
     @property
     def pid(self):
@@ -65,6 +73,11 @@ class JobTracker:
 
     def get_stderr(self):
         with open(os.path.join(self.root, 'stderr.txt')) as F:
+            line = F.readlines()[-1]
+        return line
+    
+    def get_stdout(self):
+        with open(os.path.join(self.root, 'stdout.txt')) as F:
             line = F.readlines()[-1]
         return line
 
@@ -114,6 +127,9 @@ class JobTracker:
         with open(os.path.join(tracker.root, 'log.json'), 'w') as F:
             json.dump(tracker.meta, F, indent=2)
         return tracker
+    
+    def delete_log(self):
+        shutil.rmtree(self.root)
 
     def set_tags(self, tags):
         self.tags = tags

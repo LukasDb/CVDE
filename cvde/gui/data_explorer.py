@@ -30,7 +30,6 @@ def get_vis_stack(spec, data, stacks: dict, batch_ind=0):
     if isinstance(spec, dict):
         for k, v in spec.items():
             if isinstance(k, str):
-                st.write(k)
                 stacks = get_vis_stack(v, data[k], stacks, batch_ind)
             else:
                 raise NotImplementedError("Dict with non string keys!")

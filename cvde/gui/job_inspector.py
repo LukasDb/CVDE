@@ -7,58 +7,49 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from typing import List
+import time
 
 
 class JobInspector:
     TAGS = ['final', 'notable', 'testing']
 
     def __init__(self) -> None:
+        self.expanders = {}
+        self.img_epochs = {}
+
         try:
             self.runs = os.listdir('log')
-        except FileNotFoundError:
+            self.all_trackers = [JobTracker.from_log(run) for run in self.runs]
+            self.all_trackers.sort(key=lambda t: t.started, reverse=True)
+        except Exception:
             self.runs = []
         st.subheader("Runs")
-        self._trackers = [JobTracker.from_log(run) for run in self.runs]
-        self._trackers.sort(key=lambda t:t.started, reverse=True)
+
 
     def run(self):
-        # assemble settings in sidebar
-        with st.sidebar:
-            st.subheader("Settings")
-            use_time = st.checkbox("Use actual time")
-            selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
-            cols = st.columns(2)
-            cols[0].subheader("Logged runs")
-            all_selected = cols[1].checkbox("Select all")
-
-        # filter for selected trackers
-        if len(selected_tags) > 0:
-            self._trackers = [t for t in self._trackers if any(
-                tag in selected_tags for tag in t.tags)]
-        if len(self._trackers) == 0:
-            st.info("No runs found.")
-
-        # assemble gui for filtered trackers
-        self.trackers: List[JobTracker] = []
-        for tracker in self._trackers:
-            in_progress = '🔴 ' if tracker.in_progress else ""
-            unique_name = f"{in_progress}{tracker.name} ({tracker.started})"
-            with st.sidebar:
-                if st.checkbox(unique_name, key=tracker.folder_name, value=all_selected):
-                    self.trackers.append(tracker)
+        trackers = self.get_selected_trackers()
 
         # extract variable names
         var_names = []
-        [var_names.extend(t.vars) for t in self.trackers]
+        [var_names.extend(t.vars) for t in trackers]
         var_names = np.unique(var_names)
+
+        if len(trackers) > 0:
+            self.max_epoch = max(
+                list([len(x.read_var(var_names[0])) for x in trackers]))
 
         # display data
         # for each variable name, assemble plot of data
+
         for var_name in var_names:
-            for t in self.trackers:
-                run_data = t.read_var(var_name)
-    
-                key = 't' if use_time else 'index'
+            fig = None
+            for t in trackers:
+                try:
+                    run_data = t.read_var(var_name)
+                except FileNotFoundError:
+                    continue
+
+                key = 't' if self.use_time else 'index'
                 x = np.array([getattr(i, key) for i in run_data])
                 y = [i.data for i in run_data]
 
@@ -73,49 +64,102 @@ class JobInspector:
                 y = np.array(y)
 
                 if len(y.shape) == 3:
-                    y = np.expand_dims(y, -1) # add channel to channel less images
+                    # add channel to channel less images
+                    y = np.expand_dims(y, -1)
 
                 if len(y.shape) == 4:
-                    # visualize as image
-                    with st.expander(var_name):
-                        if len(y)>1:
-                            epoch = st.slider('Epoch', min_value=0, max_value=len(y)-1, key=var_name, value=len(y)-1)
-                        else:
-                            epoch = 0
-                        y = y[epoch]
-                        channel_dim = np.argmin(y.shape)
-                        other_dims = [i for i in range(3) if i != channel_dim]
-                        transp = [*other_dims, channel_dim]
-                        img = np.transpose(y, transp)
-
-                        if y.shape[channel_dim] == 1:
-                            img = (img.astype(float) * 255 / np.max(img)).astype(np.uint8)
-                        else:
-                            img = y
-
-                        st.image(img)
+                    self.visualize_image_with_controls(
+                        var_name, y, t.unique_name)
 
                 elif len(y.shape) == 1:
-                    fig = go.Figure()
+                    if fig is None:
+                        fig = go.Figure()
                     fig.add_scatter(x=x, y=y,
-                                    name=unique_name, showlegend=True)
-                    with st.expander(var_name):
+                                    name=t.unique_name, showlegend=True)
+                    with self.get_expander(var_name, default=st.empty):
                         st.plotly_chart(fig)
 
-        with st.expander("Config"):
-            selected_trackers = [
-                t for t in self.trackers if st.session_state[t.folder_name]]
-            if len(selected_trackers) == 0:
-                return
-            cols = st.columns(len(selected_trackers))
-            for col, tracker in zip(cols, selected_trackers):
-                col.text(f"{tracker.name} ({tracker.started})")
-                with col:
-                    st.code(yaml.dump(tracker.config), language='yaml')
+        conf_exp = st.expander("Config")
+        if len(trackers) == 0:
+            return
+        cols = conf_exp.columns(len(trackers))
+        for col, tracker in zip(cols, trackers):
+            col.text(f"{tracker.name} ({tracker.started})")
+            with col:
+                conf_exp.code(yaml.dump(tracker.config), language='yaml')
 
-        with st.expander("Set tags"):
-            cols = st.columns(len(selected_trackers))
-            for tracker, col in zip(selected_trackers, cols):
-                set_tags = st.multiselect(
-                    "Tags", self.TAGS, default=tracker.tags)
-                tracker.set_tags(set_tags)
+        tags_exp = st.expander("Set tags")
+        cols = tags_exp.columns(len(trackers))
+        for tracker, col in zip(trackers, cols):
+            set_tags = tags_exp.multiselect(
+                f"Tags: {tracker.unique_name}", self.TAGS, default=tracker.tags)
+            tracker.set_tags(set_tags)
+
+    def get_selected_trackers(self):
+        # assemble settings in sidebar
+        with st.sidebar:
+            st.subheader("Settings")
+            self.use_time = st.checkbox("Use actual time")
+            selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
+            cols = st.columns(2)
+            cols[0].subheader("Logged runs")
+            all_selected = cols[1].checkbox("Select all")
+
+        # filter by tags
+        if len(selected_tags) > 0:
+            self.all_trackers = [t for t in self.all_trackers if any(
+                tag in selected_tags for tag in t.tags)]
+
+        # gui + select runs
+        trackers: List[JobTracker] = []
+        for tracker in self.all_trackers:
+            with st.sidebar:
+                if st.checkbox(tracker.unique_name, value=all_selected):
+                    trackers.append(tracker)
+
+        with st.sidebar:
+            [st.text('') for i in range(10)]
+            if st.button('delete selected (permanently)'):
+                for t in trackers:
+                    t.delete_log()
+                time.sleep(0.5)
+                st.experimental_rerun()
+        return trackers
+
+    def get_expander(self, var_name, default=None):
+        if var_name not in self.expanders:
+            self.expanders[var_name] = st.expander(var_name)
+
+            if default is not None:
+                with self.expanders[var_name]:
+                    container = default()
+                self.expanders[var_name] = container
+
+        container = self.expanders[var_name]
+        return container
+
+    def visualize_image_with_controls(self, var_name, imgs, caption):
+        exp = self.get_expander(var_name)
+
+        if var_name not in self.img_epochs:
+            epoch = 0
+            if len(imgs) > 1:
+                with exp:  # st.expander(var_name):
+                    epoch = st.slider('Epoch', min_value=0,
+                                      max_value=self.max_epoch - 1, key=var_name, value=self.max_epoch - 1)
+
+            self.img_epochs[var_name] = epoch
+
+        try:
+            epoch = self.img_epochs[var_name]
+            img = imgs[epoch]
+        except Exception:
+            return
+
+        channel_dim = np.argmin(img.shape)
+        other_dims = [i for i in range(3) if i != channel_dim]
+        transp = [*other_dims, channel_dim]
+        img = np.transpose(img, transp)
+
+        with exp:  # st.expander(var_name):
+            st.image(img, caption=caption)
