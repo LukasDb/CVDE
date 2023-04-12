@@ -72,9 +72,9 @@ def main():
 
     elif sel_p == "Deployment":
         title("Deployment")
-        st.markdown(
-            "You can download weights here in different formats. Maybe online inference as well")
-
+        from cvde.gui.deployment import Deployment
+        dp = Deployment()
+        dp.run()
 
 if __name__ == '__main__':
     main()
