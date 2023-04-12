@@ -55,8 +55,18 @@ def dashboard():
                 if clicked:
                     pid = t.pid
                     os.kill(pid, signal.SIGINT)
-
-            st.code(t.get_stderr())
+            try:
+                stderr = t.get_stderr()
+                st.text('stderr')
+                st.code(stderr)
+            except Exception:
+                pass
+            try:
+                stdout = t.get_stdout()
+                st.text('stdout')
+                st.code(stdout)
+            except Exception:
+                pass
 
     with st.expander('Workspace Overview'):
         st.subheader("Workspace Overview")
