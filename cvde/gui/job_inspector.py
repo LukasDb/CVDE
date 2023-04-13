@@ -89,13 +89,12 @@ class JobInspector:
         cols = conf_exp.columns(len(trackers))
         for col, tracker in zip(cols, trackers):
             col.text(f"{tracker.name} ({tracker.started})")
-            with col:
-                conf_exp.code(yaml.dump(tracker.config), language='yaml')
+            col.code(yaml.dump(tracker.config), language='yaml')
 
         tags_exp = st.expander("Set tags")
         cols = tags_exp.columns(len(trackers))
         for tracker, col in zip(trackers, cols):
-            set_tags = tags_exp.multiselect(
+            set_tags = col.multiselect(
                 f"Tags: {tracker.unique_name}", self.TAGS, default=tracker.tags)
             tracker.set_tags(set_tags)
 
@@ -133,15 +132,15 @@ class JobInspector:
 
     def get_expander(self, var_name, default=None):
         if var_name not in self.expanders:
-            self.expanders[var_name] = st.expander(var_name)
+            self.expanders[var_name] = exp = st.expander(var_name)
 
             if default is not None:
-                with self.expanders[var_name]:
+                with exp:
                     container = default()
+                # overwrite to internal container
                 self.expanders[var_name] = container
 
-        container = self.expanders[var_name]
-        return container
+        return self.expanders[var_name]
 
     def visualize_image_with_controls(self, var_name, imgs, caption):
         exp = self.get_expander(var_name)
@@ -149,9 +148,8 @@ class JobInspector:
         if var_name not in self.img_epochs:
             epoch = 0
             if self.max_epoch > 1:
-                with exp:  # st.expander(var_name):
-                    epoch = st.slider('Epoch', min_value=0,
-                                      max_value=self.max_epoch - 1, key=var_name, value=self.max_epoch - 1)
+                epoch = exp.slider('select', min_value=0, label_visibility='hidden',
+                                    max_value=self.max_epoch - 1, key=var_name, value=self.max_epoch - 1)
 
             self.img_epochs[var_name] = epoch
 
@@ -159,6 +157,7 @@ class JobInspector:
             epoch = self.img_epochs[var_name]
             img = imgs[epoch]
         except Exception:
+            exp.error(f"Not enough datapoints {caption}")
             return
 
         channel_dim = np.argmin(img.shape)
@@ -166,5 +165,4 @@ class JobInspector:
         transp = [*other_dims, channel_dim]
         img = np.transpose(img, transp)
 
-        with exp:  # st.expander(var_name):
-            st.image(img, caption=caption)
+        exp.image(img, caption=caption)

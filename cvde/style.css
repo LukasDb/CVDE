@@ -1,15 +1,20 @@
 /* streamlit hamburger */
-/*
+
 .css-1avcm0n.e8zbici2 {
     visibility: hidden;
 }
-*/
 
-/* page header
-.block-container.css-z5fcl4.egzxvld4 {
-    padding-top: 20px;
+/* page header */
+.css-1avcm0n.e8zbici2{
+    visibility: hidden;
 }
-*/
+
+/* overall container */
+.block-container.css-z5fcl4.egzxvld4 {
+    padding-top: 0rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
 
 
 footer {
@@ -17,8 +22,34 @@ footer {
 }
 
 
+/* tab buttons (bar) */
+[data-testid="stHorizontalBlock"]:has(div.PortMarker) {
+    gap: 2px;
+}
+
 
 /* tab buttons*/
-[data-testid="stHorizontalBlock"]:has(div.PortMarker) div.stButton > button:first-child {
+[data-testid="stHorizontalBlock"]:has(div.PortMarker) div.stButton>button:first-child {
+    /*background: none;*/
     border: none;
+    border-radius: 0;
+}
+
+/* tab buttons*/
+[data-testid="stHorizontalBlock"]:has(div.PortMarker) div.stButton>button:first-child:hover {
+    background-color: rgb(48, 48, 48);
+    color: white;
+    border: none;
+    border-radius: 0;
+}
+
+/* tab buttons*/
+[data-testid="stHorizontalBlock"]:has(div.PortMarker) div.stButton>button:first-child:focus {
+    box-shadow: none;
+}
+
+/* tab buttons (text) */
+[data-testid="stHorizontalBlock"]:has(div.PortMarker) p {
+    font-size: 1.3rem;
+    word-break: keep-all;
 }

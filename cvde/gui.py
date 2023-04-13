@@ -1,5 +1,6 @@
 import os
 import streamlit as st
+from datetime import datetime
 from cvde.workspace import Workspace as WS
 
 
@@ -12,30 +13,32 @@ def main():
         'Report a bug': "https://github.com/LukasDb/CVDE/issues",
         'About': "Tool to manage CV experiments and training deep learning models."
     })
-    st.header(WS()['name'])
     style_file = os.path.join(os.path.dirname(__file__), 'style.css')
     with open(style_file) as F:
         style = F.read()
     st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
 
-    pages = ['Dashboard', 'Data Explorer', 'Model Explorer',
-             'Config Editor', 'Job Manager', 'Inspector', 'Deployment']
+    pages = ['Dashboard', 'Data', 'Models',
+             'Configs', 'Jobs', 'Inspector', 'Deployment']
 
     if 'selected_page' not in st.session_state:
         st.session_state['selected_page'] = pages[0]
-    cols = st.columns(len(pages))
-    for col, page in zip(cols, pages):
-        with col:
-            st.write("""<div class='PortMarker'/>""", unsafe_allow_html=True)
-            if st.button(f"**{page}**"):
-                st.session_state['selected_page'] = page
 
-    st.markdown('---')
+    cols = st.columns(len(pages)+1)
+    cols[0].text("")
+    cols[0].markdown(f"**{WS()['name']}**")
+
+    for col, page in zip(cols[1:], pages):
+        col.write("""<div class='PortMarker'/>""", unsafe_allow_html=True)
+        if col.button(f"**{page}**", use_container_width=True):
+            st.session_state['selected_page'] = page
+    
 
     def title(t):
-        # c1, c2 = st.columns(2)
         st.title(t)
-        st.button('⟳', key=t + '_reload')
+        c1, c2 = st.columns([1,20])
+        c1.button('⟳', key=t + '_reload')
+        c2.markdown(f'*Last update: {datetime.now().strftime("%H:%M:%S")}*')
 
     sel_p = st.session_state['selected_page']
     if sel_p == 'Dashboard':
@@ -43,21 +46,21 @@ def main():
         from cvde.gui.dashboard import dashboard
         dashboard()
 
-    elif sel_p == 'Data Explorer':
+    elif sel_p == 'Data':
         from cvde.gui.data_explorer import data_explorer
         data_explorer()
 
-    elif sel_p == 'Model Explorer':
+    elif sel_p == 'Models':
         title("Model Explorer")
         st.markdown('An overview over the models in the workspace')
 
-    elif sel_p == 'Config Editor':
+    elif sel_p == 'Configs':
         title('Config Editor')
         from cvde.gui.config_editor import ConfigEditor
         ce = ConfigEditor()
         ce.run()
 
-    elif sel_p == 'Job Manager':
+    elif sel_p == 'Jobs':
         title('Job Manager')
         from cvde.gui.job_manager import JobManager
         jm = JobManager()
