@@ -28,6 +28,7 @@ class JobInspector:
 
     def run(self):
         trackers = self.get_selected_trackers()
+        trackers.sort(key=lambda t: t.started, reverse=True)
 
         # extract variable names
         var_names = []
@@ -35,8 +36,8 @@ class JobInspector:
         var_names = np.unique(var_names)
 
         if len(trackers) > 0:
-            self.max_epoch = max(
-                list([len(x.read_var(var_names[0])) for x in trackers]))
+            num_epochs = list([len(x.read_var(x.vars[0])) for x in trackers])
+            self.max_epoch = max(num_epochs)
 
         # display data
         # for each variable name, assemble plot of data
@@ -143,7 +144,7 @@ class JobInspector:
 
         if var_name not in self.img_epochs:
             epoch = 0
-            if len(imgs) > 1:
+            if self.max_epoch > 1:
                 with exp:  # st.expander(var_name):
                     epoch = st.slider('Epoch', min_value=0,
                                       max_value=self.max_epoch - 1, key=var_name, value=self.max_epoch - 1)

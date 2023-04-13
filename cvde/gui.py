@@ -1,5 +1,4 @@
 import os
-from st_on_hover_tabs import on_hover_tabs
 import streamlit as st
 from cvde.workspace import Workspace as WS
 

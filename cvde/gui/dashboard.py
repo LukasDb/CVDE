@@ -45,11 +45,10 @@ def dashboard():
         trackers = []
 
     with st.expander('Runs', expanded=True):
-        st.subheader("Runs")
         for t in trackers:
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns([3,1])
             with c1:
-                st.text(f"{t.name} ({t.started})")
+                st.markdown(f"**{t.unique_name}**")
             with c2:
                 clicked = st.button("Kill", key='kill_job_' + t.name)
                 if clicked:
@@ -67,6 +66,7 @@ def dashboard():
                 st.code(stdout)
             except Exception:
                 pass
+            st.divider()
 
     with st.expander('Workspace Overview'):
         st.subheader("Workspace Overview")
