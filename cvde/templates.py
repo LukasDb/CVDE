@@ -1,16 +1,13 @@
 import yaml
 import os
 
-model_template="""
-from cvde.job_tracker import JobTracker
-
-def get_model(tracker: JobTracker, *, weights_path=None, **kwargs):
-    # TODO
-    return model
+model_template = """
+def get_model(weights_path=None, **kwargs):
+    pass
 """
 
 
-dataset_template="""
+dataset_template = """
 import cvde.data_types as dt
 
 
@@ -21,13 +18,37 @@ def get_dataspec(**kwargs):
     pass
 """
 
+config_template = """
+# shared kwargs for model, datasets and task
+shared:
 
+# kwargs for get_model
+model:
+
+# kwargs for main of a task
+task:
+
+# kwargs for get_dataloader
+train_config:
+
+# kwargs for get_dataloader
+val_config:
+
+"""
+
+task_template = """
+from cvde.job_tracker import JobTracker
+
+def main(tracker: JobTracker, *, model, train_set, val_set, **kwargs):
+    pass
+
+"""
 
 templates = {
-    'tasks': f"def main(*, model, train_set, val_set, **kwargs):\n    pass",
+    'tasks': task_template,
     'datasets': f"def get_dataloader(**kwargs):\n    return []",
     'models': model_template,
-    'configs': "# shared kwargs for model, datasets and task\nshared: null\n\n# kwargs for get_model\nmodel:\n\n# kwargs for main of a task\ntask:\n\n# kwargs for get_dataloader\ntrain_config:\n\n# kwargs for get_dataloader\nval_config:\n\n",
+    'configs': config_template,
 }
 
 

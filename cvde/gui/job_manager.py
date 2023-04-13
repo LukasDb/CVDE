@@ -9,7 +9,14 @@ from typing import OrderedDict
 
 class JobManager:
     def __init__(self) -> None:
-        self.jobs = OrderedDict(WS().jobs)
+
+        self.jobs = OrderedDict()
+        jobs = list(WS().jobs.items())
+        jobs.sort()
+        for (name, job) in jobs:
+            self.jobs[name] = job
+
+
         self.managed = {'Task': WS().tasks,
                         'Config': WS().configs,
                         'Model': WS().models,
@@ -20,12 +27,12 @@ class JobManager:
             v.append('None')
 
     def run(self):
-        buttons = st.columns(4)
-        buttons[0].button("Add Job", on_click=self.add_empty_job)
-        buttons[1].button("Duplicate Selected",
-                          on_click=self.duplicate_selected)
-        buttons[2].button("Delete Selected", on_click=self.delete_jobs)
-        buttons[3].button("Launch Selected", on_click=self.run_job)
+        buttons = st.columns([1,1,1,1,5])
+        buttons[0].button("Add Job", on_click=self.add_empty_job, use_container_width=True)
+        buttons[1].button("Duplicate",
+                          on_click=self.duplicate_selected, use_container_width=True)
+        buttons[2].button("Delete", on_click=self.delete_jobs, use_container_width=True)
+        buttons[3].button("Launch", on_click=self.run_job, use_container_width=True)
 
         rows, = st.columns(1)
         with rows:
@@ -41,15 +48,16 @@ class JobManager:
 
 
     def gui_row_from_job(self, name, job_config):
-        cols=st.columns(7)
+        cols=st.columns([0.15,1.6,1,1,1,1,1])
 
         # TODO add multiselect for gpu
 
         if name + 'selected' not in st.session_state:
             st.session_state[name + 'selected']=False
 
+        [cols[0].text("") for i in range(2)] # vertical alignment
         cols[0].checkbox("Select job", key = name + 'selected',
-                         label_visibility = "hidden")
+                         label_visibility = "collapsed")
         cols[1].text_input("Job", value = name, key = name +
                            'name', on_change = self.change_name, args = (name,))
 

@@ -1,3 +1,4 @@
+import time
 import signal
 import os
 import streamlit as st
@@ -46,14 +47,16 @@ def dashboard():
 
     with st.expander('Runs', expanded=True):
         for t in trackers:
-            c1, c2 = st.columns([3,1])
+            c1, c2 = st.columns([8, 1])
             with c1:
                 st.markdown(f"**{t.unique_name}**")
             with c2:
-                clicked = st.button("Kill", key='kill_job_' + t.name)
+                clicked = st.button("Kill", key='kill_job_' + t.unique_name)
                 if clicked:
                     pid = t.pid
                     os.kill(pid, signal.SIGINT)
+                    time.sleep(0.5)
+                    st.experimental_rerun()
             try:
                 stderr = t.get_stderr()
                 st.text('stderr')

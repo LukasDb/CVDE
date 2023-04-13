@@ -75,10 +75,13 @@ class JobInspector:
                 elif len(y.shape) == 1:
                     if fig is None:
                         fig = go.Figure()
+
                     fig.add_scatter(x=x, y=y,
                                     name=t.unique_name, showlegend=True)
-                    with self.get_expander(var_name, default=st.empty):
-                        st.plotly_chart(fig)
+                    exp = self.get_expander(var_name, default=st.empty)
+                    if self.log_axes:
+                        fig.update_yaxes(type="log")
+                    exp.plotly_chart(fig)
 
         conf_exp = st.expander("Config")
         if len(trackers) == 0:
@@ -101,6 +104,7 @@ class JobInspector:
         with st.sidebar:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
+            self.log_axes =st.checkbox('Log axes', value=True)
             selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
             cols = st.columns(2)
             cols[0].subheader("Logged runs")

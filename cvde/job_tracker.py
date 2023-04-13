@@ -51,6 +51,7 @@ class JobTracker:
         tracker.root = os.path.join("log", tracker.folder_name)
         tracker.var_root = os.path.join(tracker.root, 'vars')
         tracker.weights_root = os.path.join(tracker.root, 'weights')
+        tracker.model = meta['model']
 
         return tracker
 
