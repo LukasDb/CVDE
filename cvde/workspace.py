@@ -25,7 +25,7 @@ class Workspace:
     def init(self, name):
         date = datetime.now().strftime('%Y-%m-%d')
         ws = {'name':name, 'created': date, 'models': [],
-            'datasets': [], 'configs': [], 'tasks': [], 'jobs':[]}
+            'datasets': [], 'configs': [], 'tasks': [], 'jobs':{}}
         self._write(ws)
     
     @property

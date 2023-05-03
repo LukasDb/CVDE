@@ -4,6 +4,7 @@ from workspace import Workspace as WS
 import streamlit as st
 import streamlit_ace as st_ace
 import yaml
+import pathlib
 
 class ConfigEditor():
     ace_options = {
@@ -17,13 +18,21 @@ class ConfigEditor():
 
     def run(self):
         cfg_name = st.selectbox("Configuration", options=WS().configs)
-        config = load_config(cfg_name)
-        modified = {}
-        for key, conf in config.items():
-            st.subheader(f"Kwargs ({key})")
-            text = st_ace.st_ace(yaml.dump(conf),**self.ace_options, key=cfg_name+key)
-            modified[key] = yaml.safe_load(text)
+        #config = load_config(cfg_name)
+        #modified = {}
+        #for key, conf in config.items():
+        #    st.subheader(f"Kwargs ({key})", anchor=False)
+        #config_read = yaml.dump(config, line_break=True)
+        cfg_path = pathlib.Path('configs/'+ cfg_name + '.yml')
+        with cfg_path.open() as F:
+            cfg = F.read()
+
+        text = st_ace.st_ace(cfg, **self.ace_options)
+        #modified = yaml.safe_load(text)
+
+        with cfg_path.open('w') as F:
+            F.write(text)
         
-        write_config(cfg_name, modified)
+        #write_config(cfg_name, modified)
         
 

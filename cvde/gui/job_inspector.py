@@ -1,11 +1,9 @@
-import pandas as pd
 from cvde.job_tracker import JobTracker, LogEntry
 import streamlit as st
 import os
 import yaml
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
 from typing import List
 import time
 
@@ -23,7 +21,7 @@ class JobInspector:
             self.all_trackers.sort(key=lambda t: t.started, reverse=True)
         except Exception:
             self.runs = []
-        st.subheader("Runs")
+        st.subheader("Runs", anchor=False)
 
 
     def run(self):
@@ -103,10 +101,10 @@ class JobInspector:
         with st.sidebar:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
-            self.log_axes =st.checkbox('Log axes', value=True)
+            self.log_axes =st.checkbox('Logarithmic', value=True)
             selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
             cols = st.columns(2)
-            cols[0].subheader("Logged runs")
+            cols[0].subheader("Logged runs", anchor=False)
             all_selected = cols[1].checkbox("Select all")
 
         # filter by tags
@@ -118,7 +116,7 @@ class JobInspector:
         trackers: List[JobTracker] = []
         for tracker in self.all_trackers:
             with st.sidebar:
-                if st.checkbox(tracker.unique_name, value=all_selected):
+                if st.checkbox(tracker.unique_name, value=all_selected, key=tracker.folder_name):
                     trackers.append(tracker)
 
         with st.sidebar:

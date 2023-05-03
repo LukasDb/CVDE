@@ -49,6 +49,9 @@ def get_vis_stack(spec, data, stacks: dict, batch_ind=0):
         return stacks
 
     elif isinstance(spec, dt.Image):
+        #print("Got image")
+        #print("spec: ", spec)
+        #print("img: ", data.shape)
         vis = spec.get_visualization(data)
         name_str = f"{spec.name}, " if spec.name is not None else ""
         name_str += f"Shape: {data.shape}"
@@ -136,7 +139,7 @@ def data_explorer():
 
     # build settings and assemble organized visualizations
     with st.sidebar:
-        st.subheader('Settings')
+        st.subheader('Settings', anchor=False)
 
         stacks = {0: {}}
         try:
@@ -158,7 +161,7 @@ def data_explorer():
 
     # visualizing the data
 
-    st.subheader(f"#{st.session_state.data_index}")
+    st.subheader(f"#{st.session_state.data_index}", anchor=False)
 
     cols = st.columns(2)
     for stack, col in zip(stacks.values(), cycle(cols)):

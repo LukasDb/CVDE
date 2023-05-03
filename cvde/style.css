@@ -1,11 +1,4 @@
-/* streamlit hamburger */
-
-.css-1avcm0n.e8zbici2 {
-    visibility: hidden;
-}
-
-/* page header */
-.css-1avcm0n.e8zbici2{
+[data-testid='stHeader'] {
     visibility: hidden;
 }
 

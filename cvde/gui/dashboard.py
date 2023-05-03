@@ -48,21 +48,22 @@ def dashboard():
     with st.expander('Runs', expanded=True):
         for t in trackers:
             c1, c2 = st.columns([8, 1])
-            with c1:
-                st.markdown(f"**{t.unique_name}**")
-            with c2:
-                clicked = st.button("Kill", key='kill_job_' + t.unique_name)
-                if clicked:
-                    pid = t.pid
-                    os.kill(pid, signal.SIGINT)
-                    time.sleep(0.5)
-                    st.experimental_rerun()
+            c1.markdown(f"**{t.unique_name}**")
+
+            clicked = c2.button("Kill", key='kill_job_' + t.unique_name)
+            if clicked:
+                pid = t.pid
+                os.kill(pid, signal.SIGINT)
+                time.sleep(0.5)
+                st.experimental_rerun()
+
             try:
                 stderr = t.get_stderr()
                 st.text('stderr')
                 st.code(stderr)
             except Exception:
                 pass
+
             try:
                 stdout = t.get_stdout()
                 st.text('stdout')
@@ -72,12 +73,12 @@ def dashboard():
             st.divider()
 
     with st.expander('Workspace Overview'):
-        st.subheader("Workspace Overview")
+        st.subheader("Workspace Overview", anchor=False)
         st.code(get_ws_summary())
 
     with st.expander('Device Status', expanded=True):
         smi = subprocess.run(
             ['nvidia-smi'], capture_output=True).stdout.decode()
 
-        st.subheader('Device Status')
+        st.subheader('Device Status', anchor=False)
         st.code(smi)

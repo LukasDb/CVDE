@@ -113,7 +113,7 @@ class JobManager:
                 WS().new('jobs', job + '_copy', job = self.jobs[job])
             except ModuleExistsError:
                 st.error(
-                    "Job already exists! Rename previous copy to a unique name.")
+                    f"{job}_copy already exists.")
         self.unselect_all()
 
     def add_empty_job(self):

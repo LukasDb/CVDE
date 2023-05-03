@@ -86,7 +86,7 @@ def get_ws_summary():
 def init_workspace(name):
     logging.info("Creating empty workspace...")
 
-    if len(os.listdir) > 0:
+    if len(os.listdir()) > 0:
         logging.error("Workspace is not empty!")
         exit(-1)
 

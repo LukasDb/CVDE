@@ -2,17 +2,19 @@ import os
 import streamlit as st
 from datetime import datetime
 from cvde.workspace import Workspace as WS
+import requests
 
 
 def main():
     st.set_page_config(
         layout="wide",
         page_title=WS()['name'],
-            menu_items={
-        'Get Help': 'https://github.com/LukasDb/CVDE',
-        'Report a bug': "https://github.com/LukasDb/CVDE/issues",
-        'About': "Tool to manage CV experiments and training deep learning models."
-    })
+        menu_items={
+            'Get Help': 'https://github.com/LukasDb/CVDE',
+            'Report a bug': "https://github.com/LukasDb/CVDE/issues",
+            'About': "Tool to manage CV experiments and training deep learning models."
+        })
+
     style_file = os.path.join(os.path.dirname(__file__), 'style.css')
     with open(style_file) as F:
         style = F.read()
@@ -24,7 +26,7 @@ def main():
     if 'selected_page' not in st.session_state:
         st.session_state['selected_page'] = pages[0]
 
-    cols = st.columns(len(pages)+1)
+    cols = st.columns(len(pages) + 1)
     cols[0].text("")
     cols[0].markdown(f"**{WS()['name']}**")
 
@@ -32,13 +34,15 @@ def main():
         col.write("""<div class='PortMarker'/>""", unsafe_allow_html=True)
         if col.button(f"**{page}**", use_container_width=True):
             st.session_state['selected_page'] = page
-    
+
 
     def title(t):
-        st.title(t)
-        c1, c2 = st.columns([1,20])
+        current_weather = requests.get(
+            "http://www.wttr.in", params={'format': '%c %t'}).text
+        st.title(t, anchor=False)
+        c1, c2 = st.columns([1, 20])
         c1.button('⟳', key=t + '_reload')
-        c2.markdown(f'*Last update: {datetime.now().strftime("%H:%M:%S")}*')
+        c2.markdown(f'{current_weather} *Last update: {datetime.now().strftime("%H:%M:%S")}*')
 
     sel_p = st.session_state['selected_page']
     if sel_p == 'Dashboard':
@@ -77,6 +81,7 @@ def main():
         from cvde.gui.deployment import Deployment
         dp = Deployment()
         dp.run()
+
 
 if __name__ == '__main__':
     main()

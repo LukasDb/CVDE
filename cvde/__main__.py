@@ -50,8 +50,17 @@ def init(name):
 def gui(port):
     "Run CVDE GUI in your browser"
     gui_file = os.path.join(os.path.dirname(__file__), 'gui.py')
-    proc = subprocess.Popen(["streamlit", "run", gui_file,
-                            "--server.runOnSave", "true", "--server.port", port])
+    streamlit_config = [
+        "--server.runOnSave", "true",
+        "--server.port", port,
+    #    "--theme.base", 'dark',
+    #    "--theme.backgroundColor", '#263238',
+    #    "--theme.secondaryBackgroundColor", '#455A64',
+    #    "--theme.textColor", '#ECEFF1',
+    #    "--theme.font", 'sans serif',
+    ]
+
+    proc = subprocess.Popen(["streamlit", "run", gui_file, *streamlit_config])
 
     try:
         while proc.poll() is None:

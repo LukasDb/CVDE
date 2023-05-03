@@ -10,6 +10,7 @@ from typing import Any, List
 import shutil
 
 # TODO this needs refactoring
+# move to pathlib
 
 
 @dataclass
