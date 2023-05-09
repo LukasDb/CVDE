@@ -3,3 +3,4 @@ cvde.egg-info
 test_workspace
 *.pt
 *.pyc
+.vscode/**

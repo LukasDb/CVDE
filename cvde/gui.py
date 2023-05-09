@@ -37,8 +37,12 @@ def main():
 
 
     def title(t):
-        current_weather = requests.get(
-            "http://www.wttr.in", params={'format': '%c %t'}).text
+        try:
+            current_weather = requests.get(
+                "http://www.wttr.in", params={'format': '%c %t'}, timeout=1.0).text
+        except Exception:
+            current_weather = ""
+
         st.title(t, anchor=False)
         c1, c2 = st.columns([1, 20])
         c1.button('⟳', key=t + '_reload')
