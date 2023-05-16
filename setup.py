@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-import cvde
 
 setup(
     name="cvde",
@@ -11,7 +10,7 @@ setup(
     license="todo",
     packages=find_packages(),
     install_requires=open("requirements.txt").readlines(),
-    entry_points=cvde.__entry_points__,
+    entry_points= {"console_scripts": ["cvde = cvde.__main__:run"]},
     classifiers=[
         "Development Status :: 1 - Planning",
         "Intended Audience :: Science/Research",

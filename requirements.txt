@@ -1,3 +1,5 @@
+numpy
+tensorflow
 streamlit
 click
 opencv-python
