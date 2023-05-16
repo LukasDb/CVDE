@@ -1,99 +1,64 @@
 from typing import Dict
+import tensorflow as tf
 import os
-import logging
 import yaml
-from cvde.workspace import Workspace as WS
 import importlib
-from typing import Callable
+import pathlib
+import cvde
 
 
-def load_task_fn(task_name) -> Callable:
-    module_task = importlib.import_module(f"tasks.{task_name}")
-    importlib.reload(module_task)
-    return module_task.main
 
+def load_module(base_module, module_name):
+    files = list(
+        x
+        for x in pathlib.Path(base_module).iterdir()
+        if x.is_file() and not x.stem.startswith("_")
+    )
 
-def load_config(config_name):
-    with open(os.path.join('configs', config_name + '.yml')) as F:
-        config: Dict = yaml.safe_load(F)
-
-    for key in ['shared', 'task', 'model', 'train_config', 'val_config']:
-        if config[key] is None:
-            config[key] = {}
-    return config
-
-
-def write_config(config_name, config):
-    with open(os.path.join('configs', config_name + '.yml'), 'w') as F:
-        yaml.dump(config, F)
-
-
-def load_dataset(__dataset_name, **kwargs):
-    module = importlib.import_module(
-        f"datasets.{__dataset_name}")
+    for file in files:
+        import_path = base_module + "." + file.stem
+        module = importlib.import_module(import_path)
+        if hasattr(module, module_name):
+            break
     importlib.reload(module)
-    dataset = module.get_dataloader(**kwargs)
-    return dataset
+    return module
 
 
-def load_dataspec(__data_name, **kwargs):
-    module = importlib.import_module(
-        f"datasets.{__data_name}")
-    importlib.reload(module)
-    spec = module.get_dataspec(**kwargs)
-    return spec
+def load_metric(__metric_name, **kwargs) -> tf.keras.metrics.Metric:
+    metric_module = load_module("metrics", __metric_name)
+    metric = getattr(metric_module, __metric_name)
+    metric = metric(**kwargs[__metric_name])
+    return metric
 
 
-def load_model(__model_name, **kwargs):
-    module = importlib.import_module(
-        f"models.{__model_name}")
-    importlib.reload(module)
-    model = module.get_model(**kwargs)
+def load_callback(__callback_name, tracker, **kwargs) -> tf.keras.callbacks.Callback:
+    callback_module = load_module("callbacks", __callback_name)
+    callback = getattr(callback_module, __callback_name)
+    callback = callback(tracker, **kwargs[__callback_name])
+    return callback
+
+
+def load_dataset(__dataset_name, **kwargs) -> cvde.tf.Dataset:
+    dataset_module = load_module("datasets", __dataset_name)
+    ds = getattr(dataset_module, __dataset_name)
+    return ds(**kwargs[__dataset_name])
+
+
+def load_model(__model_name, **kwargs) -> tf.keras.Model:
+    model_module = load_module("models", __model_name)
+    model = getattr(model_module, __model_name)
+    model = model(**kwargs[__model_name])
     return model
 
 
-def get_ws_summary():
-    # print summary of workspace
-    out = ""
-    out += "-- Workspace summary --\n"
-    out += "Created: " + WS()._state['created'] + "\n"
-
-    def print_entries(type):
-        entries = ""
-        for m in WS().__getattribute__(type):
-            entries += f"├───{m}\n"
-        return entries
-
-    out += "\nConfigs:\n"
-    out += print_entries('configs')
-
-    out += "\nDataloaders:\n"
-    out += print_entries('datasets')
-
-    out += "\nModels:\n"
-    out += print_entries('models')
-
-    out += "\nTasks:\n"
-    out += print_entries('tasks')
-    out += "\n"
-
-    out += "\nJobs:\n"
-    out += print_entries('jobs')
-    out += "\n"
-    return out
+def load_loss(__loss_name, **kwargs) -> tf.keras.losses.Loss:
+    loss_module = load_module("losses", __loss_name)
+    loss = getattr(loss_module, __loss_name)
+    loss = loss(**kwargs[__loss_name])
+    return loss
 
 
-def init_workspace(name):
-    logging.info("Creating empty workspace...")
-
-    if len(os.listdir()) > 0:
-        logging.error("Workspace is not empty!")
-        exit(-1)
-
-    folders = ['models', 'tasks', 'datasets', 'configs']
-    for folder in folders:
-        os.makedirs(folder)
-        with open(os.path.join(folder, '__init__.py'), 'w') as F:
-            F.write('')
-
-    WS().init(name)
+def load_job(job_name) -> Dict:
+    with open(os.path.join("jobs", job_name + ".yml")) as F:
+        job: Dict = yaml.safe_load(F)
+    return job

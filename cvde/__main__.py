@@ -4,11 +4,12 @@ import os
 import subprocess
 import json
 import importlib
-from cvde.workspace_tools import *
 import threading
 import time
 import click
-from cvde.job_executor import execute_job
+
+from cvde.workspace import Workspace as WS
+from cvde.job.job_executor import JobExecutor
 
 
 @click.group()
@@ -18,46 +19,41 @@ def run():
 
 
 @run.command()
-@click.argument('name')
-@click.argument('task')
-@click.argument('config')
-@click.argument('model')
-@click.argument('train_data')
-@click.argument('val_data')
-def execute(name, task, config, model, train_data, val_data):
+@click.argument("name")
+def execute(name):
     "Execute a given task"
-    execute_job(name, task=task, config_name=config, model_name=model,
-                train_ds=train_data, val_ds=val_data)
+    JobExecutor.run_job(name)
 
 
 @run.command()
-@click.argument('type')
-@click.argument('name')
+@click.argument("type")
+@click.argument("name")
 def create(type, name):
     "Create a new module of type {data|model|config|task}"
     create(type, name)
 
 
 @run.command()
-@click.option('-n', '--name', help='Name of the workspace')
+@click.option("-n", "--name", help="Name of the workspace")
 def init(name):
     "Create an empty workspace"
     init_workspace(name)
 
 
 @run.command()
-@click.option('-p', '--port', default='8501', help='Port to access the GUI', show_default=True)
+@click.option(
+    "-p", "--port", default="8501", help="Port to access the GUI", show_default=True
+)
 def gui(port):
     "Run CVDE GUI in your browser"
-    gui_file = os.path.join(os.path.dirname(__file__), 'gui.py')
+    gui_file = os.path.join(os.path.dirname(__file__), "gui.py")
     streamlit_config = [
-        "--server.runOnSave", "true",
-        "--server.port", port,
-    #    "--theme.base", 'dark',
-    #    "--theme.backgroundColor", '#263238',
-    #    "--theme.secondaryBackgroundColor", '#455A64',
-    #    "--theme.textColor", '#ECEFF1',
-    #    "--theme.font", 'sans serif',
+        "--server.runOnSave",
+        "true",
+        "--server.port",
+        port,
+        "--theme.base",
+        "dark",
     ]
 
     proc = subprocess.Popen(["streamlit", "run", gui_file, *streamlit_config])
@@ -73,4 +69,4 @@ def gui(port):
 
 
 def summary():
-    print(get_ws_summary())
+    print(WS().summary())

@@ -4,3 +4,5 @@ test_workspace
 *.pt
 *.pyc
 .vscode/**
+build/**
+.mypy_cache/**

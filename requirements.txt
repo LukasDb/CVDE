@@ -1,0 +1,8 @@
+streamlit
+click
+opencv-python
+plotbbox
+streamlit_ace
+pyyaml
+plotly
+docker

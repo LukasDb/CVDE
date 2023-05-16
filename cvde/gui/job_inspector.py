@@ -1,5 +1,5 @@
-from cvde.job_tracker import JobTracker, LogEntry
 import streamlit as st
+import streamlit_scrollable_textbox as stx
 import os
 import yaml
 import numpy as np
@@ -7,22 +7,20 @@ import plotly.graph_objects as go
 from typing import List
 import time
 
+from cvde.job.job_tracker import JobTracker, LogEntry
+
 
 class JobInspector:
-    TAGS = ['final', 'notable', 'testing']
+    TAGS = ["final", "notable", "testing"]
 
     def __init__(self) -> None:
         self.expanders = {}
         self.img_epochs = {}
 
-        try:
-            self.runs = os.listdir('log')
-            self.all_trackers = [JobTracker.from_log(run) for run in self.runs]
-            self.all_trackers.sort(key=lambda t: t.started, reverse=True)
-        except Exception:
-            self.runs = []
+        self.runs = os.listdir("log")
+        self.all_trackers = [JobTracker.from_log(run) for run in self.runs]
+        self.all_trackers.sort(key=lambda t: t.started, reverse=True)
         st.subheader("Runs", anchor=False)
-
 
     def run(self):
         trackers = self.get_selected_trackers()
@@ -34,7 +32,10 @@ class JobInspector:
         var_names = np.unique(var_names)
 
         if len(trackers) > 0:
-            num_epochs = list([len(x.read_var(x.vars[0])) for x in trackers])
+            try:
+                num_epochs = list([len(x.read_var(x.vars[0])) for x in trackers])
+            except Exception:
+                num_epochs = [0]
             self.max_epoch = max(num_epochs)
 
         # display data
@@ -48,16 +49,16 @@ class JobInspector:
                 except FileNotFoundError:
                     continue
 
-                key = 't' if self.use_time else 'index'
+                key = "t" if self.use_time else "index"
                 x = np.array([getattr(i, key) for i in run_data])
                 y = [i.data for i in run_data]
 
                 # convert tensors to numpy
-                if hasattr(y[0], 'cpu'):
+                if hasattr(y[0], "cpu"):
                     y = [i.cpu() for i in y]
-                if hasattr(y[0], 'detach'):
+                if hasattr(y[0], "detach"):
                     y = [i.detach() for i in y]
-                if hasattr(y[0], 'numpy'):
+                if hasattr(y[0], "numpy"):
                     y = [i.numpy() for i in y]
 
                 y = np.array(y)
@@ -67,15 +68,13 @@ class JobInspector:
                     y = np.expand_dims(y, -1)
 
                 if len(y.shape) == 4:
-                    self.visualize_image_with_controls(
-                        var_name, y, t.unique_name)
+                    self.visualize_image_with_controls(var_name, y, t.unique_name)
 
                 elif len(y.shape) == 1:
                     if fig is None:
                         fig = go.Figure()
 
-                    fig.add_scatter(x=x, y=y,
-                                    name=t.unique_name, showlegend=True)
+                    fig.add_scatter(x=x, y=y, name=t.unique_name, showlegend=True)
                     exp = self.get_expander(var_name, default=st.empty)
                     if self.log_axes:
                         fig.update_yaxes(type="log")
@@ -87,21 +86,46 @@ class JobInspector:
         cols = conf_exp.columns(len(trackers))
         for col, tracker in zip(cols, trackers):
             col.text(f"{tracker.name} ({tracker.started})")
-            col.code(yaml.dump(tracker.config), language='yaml')
+            col.code(yaml.dump(tracker.config), language="yaml")
 
         tags_exp = st.expander("Set tags")
         cols = tags_exp.columns(len(trackers))
         for tracker, col in zip(trackers, cols):
             set_tags = col.multiselect(
-                f"Tags: {tracker.unique_name}", self.TAGS, default=tracker.tags)
+                f"Tags: {tracker.name}", self.TAGS, default=tracker.tags, key="tags_"+tracker.unique_name
+            )
             tracker.set_tags(set_tags)
+
+        stdout_exp = st.expander("Stdout")
+        cols = stdout_exp.columns(len(trackers))
+        for tracker, col in zip(trackers, cols):
+            col.text(f"{tracker.name} ({tracker.started})")
+            with col:
+                stx.scrollableTextbox(
+                    tracker.get_stdout(),
+                    height=400,
+                    fontFamily="monospace",
+                    key=tracker.unique_name + "_stdout",
+                )
+
+        stderr_exp = st.expander("Stderr")
+        cols = stderr_exp.columns(len(trackers))
+        for tracker, col in zip(trackers, cols):
+            col.text(f"{tracker.name} ({tracker.started})")
+            with col:
+                stx.scrollableTextbox(
+                    tracker.get_stderr(),
+                    height=400,
+                    fontFamily="monospace",
+                    key=tracker.unique_name + "_stderr",
+                )
 
     def get_selected_trackers(self):
         # assemble settings in sidebar
         with st.sidebar:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
-            self.log_axes =st.checkbox('Logarithmic', value=True)
+            self.log_axes = st.checkbox("Logarithmic", value=True)
             selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
             cols = st.columns(2)
             cols[0].subheader("Logged runs", anchor=False)
@@ -109,21 +133,34 @@ class JobInspector:
 
         # filter by tags
         if len(selected_tags) > 0:
-            self.all_trackers = [t for t in self.all_trackers if any(
-                tag in selected_tags for tag in t.tags)]
+            self.all_trackers = [
+                t
+                for t in self.all_trackers
+                if any(tag in selected_tags for tag in t.tags)
+            ]
 
         # gui + select runs
         trackers: List[JobTracker] = []
         for tracker in self.all_trackers:
             with st.sidebar:
-                if st.checkbox(tracker.unique_name, value=all_selected, key=tracker.folder_name):
+                if st.checkbox(
+                    tracker.display_name, value=all_selected, key=tracker.unique_name
+                ):
                     trackers.append(tracker)
 
         with st.sidebar:
-            [st.text('') for i in range(10)]
-            if st.button('delete selected (permanently)'):
+            [st.text("") for i in range(10)]
+            delete_button = st.empty()
+            clicked_delete = delete_button.button("Delete selected")
+            if clicked_delete:
+                delete_button.button("Confirm?", key="confirm_delete_jobs")
+
+            if st.session_state.get("confirm_delete_jobs", False):
                 for t in trackers:
-                    t.delete_log()
+                    if t.in_progress:
+                        st.error(f"Can't delete running job {t.name}")
+                    else:
+                        t.delete_log()
                 time.sleep(0.5)
                 st.experimental_rerun()
         return trackers
@@ -146,8 +183,14 @@ class JobInspector:
         if var_name not in self.img_epochs:
             epoch = 0
             if self.max_epoch > 1:
-                epoch = exp.slider('select', min_value=0, label_visibility='hidden',
-                                    max_value=self.max_epoch - 1, key=var_name, value=self.max_epoch - 1)
+                epoch = exp.slider(
+                    "select",
+                    min_value=0,
+                    label_visibility="hidden",
+                    max_value=self.max_epoch - 1,
+                    key=var_name,
+                    value=self.max_epoch - 1,
+                )
 
             self.img_epochs[var_name] = epoch
 
