@@ -50,15 +50,15 @@ class JobExecutor:
             f"execute {tracker.folder_name}",
             detach=True,
             device_requests=[
-                docker.types.DeviceRequest(device_ids=["0"], capabilities=[["gpu"]])
+                docker.types.DeviceRequest(capabilities=[["gpu"]])
             ],
             volumes={
                 os.getcwd(): {"bind": "/ws", "mode": "rw"},
-                "/home/lukas/dev/datasets/blender/blender/": {
-                    "bind": "/home/lukas/dev/datasets/blender/blender/",  # TODO fix mounting datasets
+                "/home/lukas/blender/blender/": {
+                    "bind": "/home/lukas/blender/blender/",  # TODO fix mounting datasets
                     "mode": "rw",
                 },
-                "/home/lukas/dev/CVDE": {
+                "/home/lukas/CVDE": {
                     "bind": "/cvde",
                     "mode": "rw",
                 },  # mount CVDE package for pip install (debugging)
@@ -87,14 +87,20 @@ class JobExecutor:
             gpus = tf.config.experimental.list_physical_devices("GPU")
             [tf.config.experimental.set_memory_growth(gpu, True) for gpu in gpus]
 
+            if len(gpus)>1:
+                strategy = tf.distribute.MirroredStrategy()
+            else:
+                strategy = tf.distribute.get_strategy()
+
             print("ACTIVE GPUS: ", tf.config.experimental.list_physical_devices("GPU"))
 
             print("Running job: ", tracker.name)
-            model: tf.keras.Model = load_model(job_cfg["Model"], **job_cfg)
-            train_set = load_dataset(job_cfg["Train_Dataset"], **job_cfg)
-            val_set = load_dataset(job_cfg["Val_Dataset"], **job_cfg)
-            train_set = train_set.to_tf_dataset()
-            val_set = val_set.to_tf_dataset()
+            with strategy.scope():
+                model: tf.keras.Model = load_model(job_cfg["Model"], **job_cfg)
+                train_set = load_dataset(job_cfg["Train_Dataset"], **job_cfg)
+                val_set = load_dataset(job_cfg["Val_Dataset"], **job_cfg)
+                train_set = train_set.to_tf_dataset()
+                val_set = val_set.to_tf_dataset()
 
             # find either custom loss or use as string and hope its a tensorflow loss
             if job_cfg["Loss"] in WS().losses:
@@ -103,25 +109,28 @@ class JobExecutor:
                 loss = job_cfg["Loss"]
             
             opt_name = job_cfg["Optimizer"]
-            if opt_name in WS().optimizers:
-                raise NotImplementedError("Optimizer not implemented yet")
-                optimizer = load_optimizer(job_cfg["Optimizer"], **job_cfg)
-            else:
-                optimizer = getattr(tf.keras.optimizers, opt_name)(**job_cfg[opt_name])
-
-            metrics = []
-            for metric in job_cfg["Metrics"]:
-                if metric in WS().metrics:
-                    metrics.append(load_metric(metric, **job_cfg))
+            with strategy.scope():
+                if opt_name in WS().optimizers:
+                    raise NotImplementedError("Optimizer not implemented yet")
+                    optimizer = load_optimizer(job_cfg["Optimizer"], **job_cfg)
                 else:
-                    metrics.append(metric)
+                    optimizer = getattr(tf.keras.optimizers, opt_name)(**job_cfg[opt_name])
+
+                metrics = []
+                for metric in job_cfg["Metrics"]:
+                    if metric in WS().metrics:
+                        metrics.append(load_metric(metric, **job_cfg))
+                    else:
+                        metrics.append(metric)
 
             callbacks = [cvde.tf.CVDElogger(tracker)]
             for callback in job_cfg["Callbacks"]:
                 if callback in WS().callbacks:
                     callbacks.append(load_callback(callback, tracker, **job_cfg))
+                elif hasattr(cvde.tf, callback):
+                    callbacks.append(getattr(cvde.tf, callback)(tracker, **job_cfg[callback]))
                 else:
-                    callbacks.append(getattr(tf.keras.callbacks, callback)(**job_cfg))
+                    callbacks.append(getattr(tf.keras.callbacks, callback)(**job_cfg[callback]))
 
             print(
                 f"Compiling Model with loss: {loss}, optimizer: {optimizer}, metrics: {metrics}"
