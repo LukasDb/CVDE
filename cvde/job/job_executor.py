@@ -35,6 +35,7 @@ class JobExecutor:
                     path=str(pathlib.Path(__file__).parent.parent),
                     tag=cvde_tag,
                     rm=True,
+                    nocache=False
                 )
 
         ws_tag = f"{WS().name.lower()}/{WS().name.lower()}"
@@ -43,22 +44,19 @@ class JobExecutor:
         imgs = [image.tags[0].split(":")[0] for image in client.images.list()]
         if ws_tag not in imgs:
             with st.spinner("Building docker image"):
-                client.images.build(path=".", tag=ws_tag, rm=True)
+                client.images.build(path=".", tag=ws_tag, rm=True, nocache=False)
 
+        job_cfg = load_job(tracker.name)
+        mounts = {k: {"bind": k, "mode": "rw"} for k in job_cfg["mounts"]}
         container = client.containers.run(
             ws_tag,
             f"execute {tracker.folder_name}",
             detach=True,
-            device_requests=[
-                docker.types.DeviceRequest(capabilities=[["gpu"]])
-            ],
+            device_requests=[docker.types.DeviceRequest(capabilities=[["gpu"]])],
             volumes={
+                **mounts,
                 os.getcwd(): {"bind": "/ws", "mode": "rw"},
-                "/home/lukas/blender/blender/": {
-                    "bind": "/home/lukas/blender/blender/",  # TODO fix mounting datasets
-                    "mode": "rw",
-                },
-                "/home/lukas/CVDE": {
+                str(pathlib.Path(cvde.__file__).parent.parent): {
                     "bind": "/cvde",
                     "mode": "rw",
                 },  # mount CVDE package for pip install (debugging)
@@ -87,7 +85,7 @@ class JobExecutor:
             gpus = tf.config.experimental.list_physical_devices("GPU")
             [tf.config.experimental.set_memory_growth(gpu, True) for gpu in gpus]
 
-            if len(gpus)>1:
+            if len(gpus) > 1:
                 strategy = tf.distribute.MirroredStrategy()
             else:
                 strategy = tf.distribute.get_strategy()
@@ -107,14 +105,16 @@ class JobExecutor:
                 loss = load_loss(job_cfg["Loss"], **job_cfg)
             else:
                 loss = job_cfg["Loss"]
-            
+
             opt_name = job_cfg["Optimizer"]
             with strategy.scope():
                 if opt_name in WS().optimizers:
                     raise NotImplementedError("Optimizer not implemented yet")
                     optimizer = load_optimizer(job_cfg["Optimizer"], **job_cfg)
                 else:
-                    optimizer = getattr(tf.keras.optimizers, opt_name)(**job_cfg[opt_name])
+                    optimizer = getattr(tf.keras.optimizers, opt_name)(
+                        **job_cfg[opt_name]
+                    )
 
                 metrics = []
                 for metric in job_cfg["Metrics"]:
@@ -128,9 +128,13 @@ class JobExecutor:
                 if callback in WS().callbacks:
                     callbacks.append(load_callback(callback, tracker, **job_cfg))
                 elif hasattr(cvde.tf, callback):
-                    callbacks.append(getattr(cvde.tf, callback)(tracker, **job_cfg[callback]))
+                    callbacks.append(
+                        getattr(cvde.tf, callback)(tracker, **job_cfg[callback])
+                    )
                 else:
-                    callbacks.append(getattr(tf.keras.callbacks, callback)(**job_cfg[callback]))
+                    callbacks.append(
+                        getattr(tf.keras.callbacks, callback)(**job_cfg[callback])
+                    )
 
             print(
                 f"Compiling Model with loss: {loss}, optimizer: {optimizer}, metrics: {metrics}"

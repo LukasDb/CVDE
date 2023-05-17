@@ -3,6 +3,7 @@ cvde.egg-info
 test_workspace
 *.pt
 *.pyc
+__pycache__/
 .vscode/**
 build/**
 .mypy_cache/**
