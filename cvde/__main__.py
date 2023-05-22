@@ -1,11 +1,6 @@
 import logging
-import sys
 import os
 import subprocess
-import json
-import importlib
-import threading
-import time
 import click
 
 from cvde.workspace import Workspace as WS
@@ -60,7 +55,7 @@ def gui(port):
 
     try:
         while proc.poll() is None:
-            logging.info(proc.communicate(timeout=1.0))
+            logging.info(proc.communicate())
 
     except KeyboardInterrupt:
         logging.warning("User interrupted.")

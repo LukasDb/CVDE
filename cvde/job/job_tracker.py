@@ -112,7 +112,10 @@ class JobTracker:
         return line
 
     def delete_log(self):
-        docker.from_env().containers.get(self.folder_name).remove(force=True)
+        try:
+            docker.from_env().containers.get(self.folder_name).remove(force=True)
+        except Exception:
+            pass
         shutil.rmtree(self.root)
 
     def set_tags(self, tags):

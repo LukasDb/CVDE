@@ -1,4 +1,16 @@
 import os
+
+import tensorflow as tf
+
+gpus = tf.config.experimental.list_physical_devices("GPU")
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        print(e)
+
+
 import streamlit as st
 from datetime import datetime
 from cvde.workspace import Workspace as WS
@@ -25,7 +37,7 @@ def main():
         "Dashboard",
         "Data",
         "Models",
-        #"Configurator",
+        # "Configurator",
         "Jobs",
         "Inspector",
         "Deployment",
@@ -73,9 +85,9 @@ def main():
     elif sel_p == "Models":
         title("Model Explorer")
         from cvde.gui.model_explorer import ModelExplorer
+
         me = ModelExplorer()
         me.run()
-
 
     elif sel_p == "Configurator":
         title("Configurator")

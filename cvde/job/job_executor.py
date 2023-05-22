@@ -57,11 +57,7 @@ class JobExecutor:
             device_requests=[docker.types.DeviceRequest(capabilities=[["gpu"]])],
             volumes={
                 **mounts,
-                os.getcwd(): {"bind": "/ws", "mode": "rw"},
-                # str(pathlib.Path(cvde.__file__).parent.parent): {
-                #    "bind": "/cvde",
-                #    "mode": "rw",
-                # },  # mount CVDE package for pip install (debugging)
+                os.getcwd(): {"bind": "/ws", "mode": "rw"},  # bind current workspace
             },
             user=os.getuid(),
             # working_dir="/ws",
@@ -115,7 +111,9 @@ class JobExecutor:
                 raise NotImplementedError("Optimizer not implemented yet")
                 optimizer = load_optimizer(job_cfg["Optimizer"], **job_cfg)
             else:
-                optimizer = getattr(tf.keras.optimizers, opt_name)(**job_cfg[opt_name])
+                optimizer = getattr(tf.keras.optimizers, opt_name)(
+                    **job_cfg.get(opt_name, {})
+                )
 
             metrics = []
             for metric in job_cfg["Metrics"]:
