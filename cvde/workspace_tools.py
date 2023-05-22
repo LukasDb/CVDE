@@ -7,7 +7,6 @@ import pathlib
 import cvde
 
 
-
 def load_module(base_module, module_name):
     files = list(
         x
@@ -31,14 +30,15 @@ def load_metric(__metric_name, **kwargs) -> tf.keras.metrics.Metric:
     return metric
 
 
-def load_callback(__callback_name, tracker, **kwargs) -> tf.keras.callbacks.Callback:
+def load_callback(__callback_name):
     callback_module = load_module("callbacks", __callback_name)
     callback = getattr(callback_module, __callback_name)
-    callback = callback(tracker, **kwargs.get(__callback_name, {}))
     return callback
 
 
 def load_dataset(__dataset_name, **kwargs) -> cvde.tf.Dataset:
+    if __dataset_name is None:
+        return None
     dataset_module = load_module("datasets", __dataset_name)
     ds = getattr(dataset_module, __dataset_name)
     return ds(**kwargs.get(__dataset_name, {}))
@@ -51,10 +51,9 @@ def load_model(__model_name, **kwargs) -> tf.keras.Model:
     return model
 
 
-def load_loss(__loss_name, **kwargs) -> tf.keras.losses.Loss:
+def load_loss(__loss_name):
     loss_module = load_module("losses", __loss_name)
     loss = getattr(loss_module, __loss_name)
-    loss = loss(**kwargs.get(__loss_name, {}))
     return loss
 
 

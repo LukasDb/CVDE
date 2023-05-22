@@ -94,49 +94,66 @@ class JobExecutor:
         with strategy.scope():
             model: tf.keras.Model = load_model(job_cfg["Model"], **job_cfg)
             train_set = load_dataset(job_cfg["Train_Dataset"], **job_cfg)
-            val_set = load_dataset(job_cfg["Val_Dataset"], **job_cfg)
             train_set = train_set.to_tf_dataset()
-            val_set = val_set.to_tf_dataset()
 
-        # find either custom loss or use as string and hope its a tensorflow loss
+            val_set = load_dataset(job_cfg["Val_Dataset"], **job_cfg)
+            if val_set is not None:
+                val_set = val_set.to_tf_dataset()
+
+        compile_kwargs = {}
+
+        # --- LOSS ---
+        loss_name = job_cfg.get("Loss", "none")
+        if loss_name in WS().losses:
+            loss_fn = load_loss(loss_name)
+        else:
+            loss_fn = getattr(tf.keras.losses, loss_name, None)
+
+        if loss_fn is not None:
+            with strategy.scope():
+                loss = loss_fn(**job_cfg.get(loss_name, {}))
+                compile_kwargs["loss"] = loss
+
+        # --- OPTIMIZER ---
+        opt_name = job_cfg.get("Optimizer", "none")
+        if opt_name in WS().optimizers:
+            raise NotImplementedError("Optimizer not implemented yet")
+            opt_fn = load_optimizer(job_cfg["Optimizer"])
+        else:
+            opt_fn = getattr(tf.keras.optimizers, opt_name, None)
+
+        if opt_fn is not None:
+            with strategy.scope():
+                optimizer = opt_fn(**job_cfg.get(opt_name, {}))
+                compile_kwargs["optimizer"] = optimizer
+
+        # METRICS
         with strategy.scope():
-            if job_cfg["Loss"] in WS().losses:
-                loss = load_loss(job_cfg["Loss"], **job_cfg)
-            else:
-                loss = job_cfg["Loss"]
-
-        opt_name = job_cfg["Optimizer"]
-        with strategy.scope():
-            if opt_name in WS().optimizers:
-                raise NotImplementedError("Optimizer not implemented yet")
-                optimizer = load_optimizer(job_cfg["Optimizer"], **job_cfg)
-            else:
-                optimizer = getattr(tf.keras.optimizers, opt_name)(
-                    **job_cfg.get(opt_name, {})
-                )
-
             metrics = []
-            for metric in job_cfg["Metrics"]:
+            for metric in job_cfg.get("Metrics", []):
                 if metric in WS().metrics:
                     metrics.append(load_metric(metric, **job_cfg))
                 else:
                     metrics.append(metric)
+        compile_kwargs["metrics"] = metrics
 
+        # CALLBACKS
         callbacks = [cvde.tf.CVDElogger(tracker)]
-        for callback in job_cfg["Callbacks"]:
-            if callback in WS().callbacks:
-                callbacks.append(load_callback(callback, tracker, **job_cfg))
-            elif hasattr(cvde.tf, callback):
-                callbacks.append(
-                    getattr(cvde.tf, callback)(tracker, **job_cfg.get(callback, {}))
-                )
+        for cb_name in job_cfg.get("Callbacks", "none"):
+            cb_kwargs = job_cfg.get(cb_name, {})
+            if cb_name in WS().callbacks:
+                cb_fn = load_callback(cb_name)
+                cb_kwargs["tracker"] = tracker
+            elif hasattr(cvde.tf, cb_name):
+                cb_fn = getattr(cvde.tf, cb_name)
+                cb_kwargs["tracker"] = tracker
+
             else:
-                callbacks.append(
-                    getattr(tf.keras.callbacks, callback)(**job_cfg.get(callback, {}))
-                )
+                cb_fn = getattr(tf.keras.callbacks, cb_name, None)
+            callbacks.append(cb_fn(**cb_kwargs))
 
         # print(f"Compiling Model with loss: {loss}, optimizer: {optimizer}, metrics: {metrics}")
-        model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+        model.compile(**compile_kwargs)
 
         # print("Fitting model with callbacks: ", callbacks)
         model.fit(
