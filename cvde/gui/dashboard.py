@@ -13,42 +13,6 @@ import docker
 
 
 def dashboard():
-    with st.expander("Creator"):
-        col1, col2, col3 = st.columns((1, 2, 1))
-        col1.markdown("Add new dataset:")
-        dataset_name = col2.text_input("dataset name")
-        col3.button(
-            "+",
-            key="ds_btn",
-            on_click=lambda: WS().new("datasets", dataset_name, from_template=True),
-        )
-
-        col1, col2, col3 = st.columns((1, 2, 1))
-        col1.markdown("Add new config:")
-        config_name = col2.text_input("config name")
-        col3.button(
-            "+",
-            key="cfg_btn",
-            on_click=lambda: WS().new("configs", config_name, from_template=True),
-        )
-
-        col1, col2, col3 = st.columns((1, 2, 1))
-        col1.markdown("Add new model:")
-        model_name = col2.text_input("model name")
-        col3.button(
-            "+",
-            key="model_btn",
-            on_click=lambda: WS().new("models", model_name, from_template=True),
-        )
-
-        col1, col2, col3 = st.columns((1, 2, 1))
-        col1.markdown("Add new task:")
-        task_name = col2.text_input("task name")
-        col3.button(
-            "+",
-            key="task_btn",
-            on_click=lambda: WS().new("tasks", task_name, from_template=True),
-        )
 
     try:
         runs = os.listdir("log")

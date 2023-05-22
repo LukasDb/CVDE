@@ -1,5 +1,6 @@
 numpy
 tensorflow
+silence_tensorflow
 streamlit
 click
 opencv-python

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cvde",
-    version="0.1.1",
+    version="0.1.2",
     description="A development environment for supervised deep learning in computer vision",
     url="todo",
     author="Lukas Dirnberger",

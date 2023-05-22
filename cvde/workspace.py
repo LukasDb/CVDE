@@ -11,8 +11,6 @@ import pathlib
 import inspect
 import tensorflow as tf
 
-
-from cvde.templates import realize_template
 import cvde
 
 sys.path.append(os.getcwd())
@@ -36,28 +34,32 @@ class Workspace:
         except FileNotFoundError:
             pass
 
-    def initialize(self, name) -> None:
-        """create a new empty workspace"""
-        self.name: str = name
-        self.created: str = datetime.now().strftime("%Y-%m-%d")
-        for k in self._keys:
-            self.__setattr__(k, [])
-        self._write_state()
-
-    def init_workspace(name):
+    def init_workspace(self, name: str) -> None:
         logging.info("Creating empty workspace...")
-
         if len(os.listdir()) > 0:
             logging.error("Workspace is not empty!")
             exit(-1)
 
-        folders = ["models", "tasks", "datasets", "configs"]
+        self.name: str = name
+        self.created: str = datetime.now().strftime("%Y-%m-%d")
+
+        state = {"name": self.name, "created": self.created}
+        with open(".workspace.cvde", "w") as F:
+            json.dump(state, F, indent=4)
+
+        folders = [
+            "models",
+            "datasets",
+            "jobs",
+            "optimizers",
+            "losses",
+            "callbacks",
+            "metrics",
+        ]
         for folder in folders:
             os.makedirs(folder)
             with open(os.path.join(folder, "__init__.py"), "w") as F:
                 F.write("")
-
-        WS().init(name)
 
     def _read_state(self):
         with open(".workspace.cvde") as F:
@@ -65,10 +67,12 @@ class Workspace:
         self.name = state["name"]
         self.created = state["created"]
 
-    @property
-    def datasets(self):
-        base_module = "datasets"
-        self.__del_loaded_module(base_module)
+    def _list_modules(self, base_module: str, condition: Callable[[Any], bool]):
+        loaded = sys.modules.copy()
+        for mod in loaded:
+            if mod.startswith(base_module):
+                del sys.modules[mod]
+
         files = list(
             x
             for x in pathlib.Path(base_module).iterdir()
@@ -86,37 +90,22 @@ class Workspace:
                 [
                     k
                     for k, v in module.__dict__.items()
-                    if inspect.isclass(v)
-                    and issubclass(v, cvde.tf.Dataset)
-                    and not k.startswith("_")
+                    if condition(v) and not k.startswith("_")
                 ]
             )
         return datasets
 
     @property
-    def models(self):
-        base_module = "models"
-        self.__del_loaded_module(base_module)
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
+    def datasets(self):
+        return self._list_modules(
+            "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
         )
-        models = []
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            importlib.reload(module)
-            models.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if inspect.isclass(v)
-                    and issubclass(v, tf.keras.Model)
-                    and not k.startswith("_")
-                ]
-            )
-        return models
+
+    @property
+    def models(self):
+        return self._list_modules(
+            "models", lambda v: inspect.isclass(v) and issubclass(v, tf.keras.Model)
+        )
 
     @property
     def jobs(self):
@@ -126,156 +115,32 @@ class Workspace:
 
     @property
     def losses(self):
-        base_module = "losses"
-        self.__del_loaded_module(base_module)
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
+        return self._list_modules(
+            "losses",
+            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss),
         )
-        losses = []
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            importlib.reload(module)
-            losses.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if (
-                        inspect.isclass(v)
-                        and issubclass(v, tf.keras.losses.Loss)
-                        and not k.startswith("_")
-                    )
-                    or isinstance(v, Callable)
-                ]
-            )
-        return losses
 
     @property
     def callbacks(self):
-        base_module = "callbacks"
-        self.__del_loaded_module(base_module)
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
+        return self._list_modules(
+            "callbacks",
+            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.callbacks.Callback),
         )
-        callbacks = []
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            importlib.reload(module)
-            callbacks.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if inspect.isclass(v)
-                    and issubclass(v, tf.keras.callbacks.Callback)
-                    and not k.startswith("_")
-                ]
-            )
-        return callbacks
 
     @property
     def metrics(self):
-        base_module = "metrics"
-        self.__del_loaded_module(base_module)
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
+        return self._list_modules(
+            "metrics",
+            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.metrics.Metric),
         )
-        metrics = []
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            importlib.reload(module)
-            metrics.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if inspect.isclass(v) and issubclass(v, tf.keras.metrics.Metric)
-                ]
-            )
-        return metrics
 
     @property
     def optimizers(self):
-        base_module = "optimizers"
-        self.__del_loaded_module(base_module)
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
+        return self._list_modules(
+            "optimizers",
+            lambda v: inspect.isclass(v)
+            and issubclass(v, tf.keras.optimizers.Optimizer),
         )
-        optimizers = []
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            importlib.reload(module)
-            optimizers.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if inspect.isclass(v)
-                    and issubclass(v, tf.keras.optimizers.Optimizer)
-                ]
-            )
-        return optimizers
-
-    def _write_state(self):
-        state = {"name": self.NAME, "created": self.CREATED}
-        with open(".workspace.cvde", "w") as F:
-            json.dump(state, F, indent=4)
-
-    def __del_loaded_module(self, base_module):
-        loaded = sys.modules.copy()
-        for module in loaded:
-            if module.startswith(base_module):
-                del sys.modules[module]
-
-    def ___delete(self, type, name):
-        state = self._state
-        state[type].pop(name)
-        self._write(state)
-
-    def ___new(self, type, name, from_template=False, job: dict = None):
-        """registers new module in workspace.
-        Generate a file if from_template is true
-        if registering a job, enter defaults
-
-        """
-        assert type in [
-            "datasets",
-            "models",
-            "tasks",
-            "jobs",
-            "configs",
-        ], f"Unknown type: {type}.Must be one of data|model|task|config"
-
-        if name in self.__getattribute__(type):
-            logging.error(f"Not created: <{name}> ({type}) already exists")
-            raise ModuleExistsError
-
-        if from_template:
-            realize_template(type, name)
-
-        state = self._state
-        if type == "jobs":
-            if job is None:
-                job = {
-                    "Task": "None",
-                    "Model": "None",
-                    "Config": "None",
-                    "Model": "None",
-                    "Train Dataset": "None",
-                    "Val Dataset": "None",
-                }
-            state[type].update({name: job})
-        else:
-            state[type].append(name)
-        self._write(state)
 
     def summary(self) -> str:
         # print summary of workspace

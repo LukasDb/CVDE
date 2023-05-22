@@ -37,7 +37,7 @@ def create(type, name):
 @click.option("-n", "--name", help="Name of the workspace")
 def init(name):
     "Create an empty workspace"
-    init_workspace(name)
+    WS().init_workspace(name)
 
 
 @run.command()
@@ -60,7 +60,7 @@ def gui(port):
 
     try:
         while proc.poll() is None:
-            logging.info(proc.communicate(1.0))
+            logging.info(proc.communicate(timeout=1.0))
 
     except KeyboardInterrupt:
         logging.warning("User interrupted.")

@@ -1,12 +1,14 @@
 FROM tensorflow/tensorflow:latest-gpu
 
+#RUN groupadd -r cvde && useradd -r -m -g cvde cvde
+#USER cvde
 
+RUN export PATH=$PATH:$HOME/.local/bin
 
-COPY requirements.txt /tmp/
-RUN pip install -r /tmp/requirements.txt
+WORKDIR $HOME/CVDE
 
-#WORKDIR /cvde
-#COPY . /cvde
-#RUN python -m pip install /cvde/.
+COPY . .
+#COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-WORKDIR /ws
+RUN pip install .

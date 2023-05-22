@@ -55,12 +55,11 @@ class JobTracker:
         job_config_path = Path("jobs") / (job_name + ".yml")
         shutil.copy(job_config_path, root / "job.yml")
 
+        started = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         meta = {
             "name": job_name,
-            "started": "0",
-            "in_progress": False,
+            "started": started,
             "tags": [],
-            "pid": None,
         }
 
         with (root / "log.json").open("w") as F:
@@ -79,12 +78,6 @@ class JobTracker:
         return f"{in_progress}{self.name} ({self.started})"
 
     @property
-    def pid(self):
-        with (self.root / "log.json").open() as F:
-            meta = json.load(F)
-        return meta["pid"]
-
-    @property
     def in_progress(self):
         containers = docker.from_env().containers.list()
         try:
@@ -101,35 +94,35 @@ class JobTracker:
         return meta
 
     def get_stderr(self):
-        content = docker.from_env().containers.get(self.folder_name).logs(stdout=False, stderr=True).decode()
+        content = (
+            docker.from_env()
+            .containers.get(self.folder_name)
+            .logs(stdout=False, stderr=True)
+            .decode()
+        )
         return content
 
     def get_stdout(self):
-        line = docker.from_env().containers.get(self.folder_name).logs(stdout=True, stderr=False).decode()
+        line = (
+            docker.from_env()
+            .containers.get(self.folder_name)
+            .logs(stdout=True, stderr=False)
+            .decode()
+        )
         return line
 
     def delete_log(self):
+        docker.from_env().containers.get(self.folder_name).remove(force=True)
         shutil.rmtree(self.root)
 
     def set_tags(self, tags):
         self.tags = tags
-        self.__overwrite_meta("tags", tags)
 
-    def __overwrite_meta(self, key, value):
         with (self.root / "log.json").open() as F:
             data = json.load(F)
-        data[key] = value
+        data["tags"] = tags
         with (self.root / "log.json").open("w") as F:
             json.dump(data, F, indent=2)
-
-    def __enter__(self):
-        self.started = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.__overwrite_meta("in_progress", True)
-        self.__overwrite_meta("started", self.started)
-        self.__overwrite_meta("pid", os.getpid())
-
-    def __exit__(self, type, value, traceback):
-        self.__overwrite_meta("in_progress", False)
 
     @property
     def vars(self):
