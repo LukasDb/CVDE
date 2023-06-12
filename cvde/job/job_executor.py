@@ -10,11 +10,12 @@ from cvde.workspace import Workspace as WS
 from .job_tracker import JobTracker
 import pathlib
 import os
+import numpy as np
 from typing import TYPE_CHECKING
-import docker
-import docker.models.containers
 import streamlit as st
 import cvde
+
+import multiprocessing as mp
 
 
 class JobExecutor:
@@ -25,65 +26,44 @@ class JobExecutor:
         """non-blocking launch job"""
         tracker = JobTracker.create(name)
 
-        client = docker.from_env()
-        # build image for CVDE if not exists
-        cvde_tag = "cvde/cvde"
-        # imgs = [image.tags[0].split(":")[0] for image in client.images.list()]
-        # if cvde_tag not in imgs:
-        with st.spinner("Building CVDE base image"):
-            path = str(pathlib.Path(__file__).parent.parent.parent.resolve())
-            client.images.build(
-                path=path,
-                tag=cvde_tag,
-                rm=True,
-                nocache=False,
-            )
-
-        ws_tag = f"{WS().name.lower()}/{WS().name.lower()}"
-
-        # build image for current project if not exists
-        # imgs = [image.tags[0].split(":")[0] for image in client.images.list()]
-        # if ws_tag not in imgs or True:
-        with st.spinner("Building docker image"):
-            client.images.build(path=".", tag=ws_tag, rm=True, nocache=False)
-
-        job_cfg = load_job(tracker.name)
-        mounts = {k: {"bind": k, "mode": "rw"} for k in job_cfg["mounts"]}
-        container = client.containers.run(
-            ws_tag,
-            f"execute {tracker.folder_name}",
-            detach=True,
-            remove=False,
-            device_requests=[docker.types.DeviceRequest(capabilities=[["gpu"]])],
-            volumes={
-                **mounts,
-                os.getcwd(): {"bind": "/ws", "mode": "rw"},  # bind current workspace
-            },
-            user=os.getuid(),
-            # working_dir="/ws",
-            name=tracker.folder_name,
-        )
+        job_proc = mp.Process(target=JobExecutor.run_job, args=(tracker.folder_name,), name="thread_"+tracker.unique_name)
+        job_proc.start()
+        # launch non-blocking job
 
     @staticmethod
     def run_job(folder_name: str):
         tracker = JobTracker.from_log(folder_name)
+        tracker.set_thread_ident()
+        class Unbuffered:
+            def __init__(self, stream, file):
+                self.stream = stream
+                self.fp = open(file, 'w')
+
+            def write(self, data):
+                self.stream.write(data)
+                self.stream.flush()
+                self.fp.write(data)    # Write the data of stdout here to a text file as well
+                self.fp.flush()
+
+        import sys
+        sys.stdout = Unbuffered(sys.stdout, tracker.stdout_file)
+        sys.stderr = Unbuffered(sys.stderr, tracker.stderr_file)
+
+
         job_cfg = load_job(tracker.name)
 
         import sys
-
         sys.path.append(".")  # otherwise import errors
-
-        import os
-
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(x) for x in job_cfg["gpus"]])
 
         import silence_tensorflow.auto
         import tensorflow as tf
 
-        gpus = tf.config.experimental.list_physical_devices("GPU")
-        [tf.config.experimental.set_memory_growth(gpu, True) for gpu in gpus]
+        available_gpus = tf.config.experimental.list_physical_devices("GPU")
+        selected_gpus = [x for x in available_gpus if int(x.name.split(':')[-1]) in job_cfg['gpus']]
+        [tf.config.experimental.set_memory_growth(gpu, True) for gpu in available_gpus]
+        tf.config.set_visible_devices(selected_gpus, device_type="GPU")
 
-        if len(gpus) > 1:
+        if len(selected_gpus) > 1:
             strategy = tf.distribute.MirroredStrategy()
         else:
             strategy = tf.distribute.get_strategy()
@@ -150,7 +130,9 @@ class JobExecutor:
 
             else:
                 cb_fn = getattr(tf.keras.callbacks, cb_name, None)
-            callbacks.append(cb_fn(**cb_kwargs))
+            
+            if cb_fn is not None:
+                callbacks.append(cb_fn(**cb_kwargs))
 
         # print(f"Compiling Model with loss: {loss}, optimizer: {optimizer}, metrics: {metrics}")
         model.compile(**compile_kwargs)

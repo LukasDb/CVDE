@@ -1,6 +1,7 @@
 import time
 import signal
 import os
+
 import streamlit as st
 import streamlit_scrollable_textbox as stx
 import subprocess
@@ -9,8 +10,7 @@ from datetime import datetime
 from cvde.job import job_tracker as job
 from cvde.workspace import Workspace as WS
 
-import docker
-
+import multiprocessing as mp
 
 def dashboard():
 
@@ -34,12 +34,10 @@ def dashboard():
                 kill_button.button("Confirm?", key="confirm_kill_job_" + t.unique_name)
 
             if st.session_state.get("confirm_kill_job_" + t.unique_name, False):
-                container_id = t.folder_name
-                st.warning(f"Killing {container_id}")
-                cont = docker.from_env().containers.get(container_id)
-                cont.kill()
+                st.warning(f"Killing {t.name}")
+                os.kill(t.ident, signal.SIGKILL)
+
                 time.sleep(0.5)
-                cont.stop()
                 st.experimental_rerun()
 
             try:

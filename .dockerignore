@@ -1,6 +1,0 @@
-build/
-.vscode/
-.mypy_cache/
-*.pyc
-Dockerfile
-cvde.egg-info
