@@ -16,6 +16,7 @@ import streamlit as st
 import cvde
 
 import multiprocessing as mp
+import threading
 
 
 class JobExecutor:
@@ -26,40 +27,52 @@ class JobExecutor:
         """non-blocking launch job"""
         tracker = JobTracker.create(name)
 
-        job_proc = mp.Process(target=JobExecutor.run_job, args=(tracker.folder_name,), name="thread_"+tracker.unique_name)
-        job_proc.start()
+        job_thread = threading.Thread(
+            target=JobExecutor.run_job,
+            args=(tracker.folder_name,),
+            name="thread_" + tracker.unique_name,
+        )
+        job_thread.start()
         # launch non-blocking job
 
     @staticmethod
     def run_job(folder_name: str):
         tracker = JobTracker.from_log(folder_name)
         tracker.set_thread_ident()
+
         class Unbuffered:
             def __init__(self, stream, file):
                 self.stream = stream
-                self.fp = open(file, 'w')
+                self.fp = open(file, "w")
 
             def write(self, data):
                 self.stream.write(data)
                 self.stream.flush()
-                self.fp.write(data)    # Write the data of stdout here to a text file as well
+                self.fp.write(data)
                 self.fp.flush()
 
+            def flush(self):
+                self.fp.flush()
+                self.stream.flush()
+
         import sys
+
         sys.stdout = Unbuffered(sys.stdout, tracker.stdout_file)
         sys.stderr = Unbuffered(sys.stderr, tracker.stderr_file)
-
 
         job_cfg = load_job(tracker.name)
 
         import sys
+
         sys.path.append(".")  # otherwise import errors
 
         import silence_tensorflow.auto
         import tensorflow as tf
 
         available_gpus = tf.config.experimental.list_physical_devices("GPU")
-        selected_gpus = [x for x in available_gpus if int(x.name.split(':')[-1]) in job_cfg['gpus']]
+        selected_gpus = [
+            x for x in available_gpus if int(x.name.split(":")[-1]) in job_cfg["gpus"]
+        ]
         [tf.config.experimental.set_memory_growth(gpu, True) for gpu in available_gpus]
         tf.config.set_visible_devices(selected_gpus, device_type="GPU")
 
@@ -130,7 +143,7 @@ class JobExecutor:
 
             else:
                 cb_fn = getattr(tf.keras.callbacks, cb_name, None)
-            
+
             if cb_fn is not None:
                 callbacks.append(cb_fn(**cb_kwargs))
 

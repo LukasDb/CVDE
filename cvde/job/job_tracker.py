@@ -9,8 +9,7 @@ import sys
 from typing import Any, List
 import shutil
 import yaml
-
-import multiprocessing as mp
+import threading
 
 
 @dataclass
@@ -89,8 +88,9 @@ class JobTracker:
 
     @property
     def in_progress(self):
-        children = mp.active_children()
-        return "thread_"+self.unique_name in [c.name for c in children]
+        # children = mp.active_children()
+        # return "thread_"+self.unique_name in [c.name for c in children]
+        return "thread_" + self.unique_name in threading.enumerate()
 
     @property
     def config(self):
@@ -100,7 +100,7 @@ class JobTracker:
 
     def get_stderr(self):
         return self.stderr_file.read_text()
-        
+
     def get_stdout(self):
         return self.stdout_file.read_text()
 
@@ -117,7 +117,7 @@ class JobTracker:
             json.dump(data, F, indent=2)
 
     def set_thread_ident(self):
-        #ident = threading.get_ident()
+        # ident = threading.get_ident()
         ident = os.getpid()
         self.ident = ident
         with (self.root / "log.json").open() as F:

@@ -12,8 +12,8 @@ from cvde.workspace import Workspace as WS
 
 import multiprocessing as mp
 
-def dashboard():
 
+def dashboard():
     try:
         runs = os.listdir("log")
 
