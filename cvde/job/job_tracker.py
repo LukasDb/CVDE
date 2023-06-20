@@ -90,7 +90,7 @@ class JobTracker:
     def in_progress(self):
         # children = mp.active_children()
         # return "thread_"+self.unique_name in [c.name for c in children]
-        return "thread_" + self.unique_name in threading.enumerate()
+        return "thread_" + self.unique_name in [t.name for t in threading.enumerate()]
 
     @property
     def config(self):

@@ -11,11 +11,11 @@ from .job_tracker import JobTracker
 import pathlib
 import os
 import numpy as np
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 import streamlit as st
+import tensorflow as tf
 import cvde
 
-import multiprocessing as mp
 import threading
 
 
@@ -66,18 +66,15 @@ class JobExecutor:
 
         sys.path.append(".")  # otherwise import errors
 
-        import silence_tensorflow.auto
-        import tensorflow as tf
-
         available_gpus = tf.config.experimental.list_physical_devices("GPU")
         selected_gpus = [
-            x for x in available_gpus if int(x.name.split(":")[-1]) in job_cfg["gpus"]
+            x.name.split('physical_device:')[-1] for x in available_gpus if int(x.name.split(":")[-1]) in job_cfg["gpus"]
         ]
-        [tf.config.experimental.set_memory_growth(gpu, True) for gpu in available_gpus]
-        tf.config.set_visible_devices(selected_gpus, device_type="GPU")
 
-        if len(selected_gpus) > 1:
-            strategy = tf.distribute.MirroredStrategy()
+        if True or len(selected_gpus) > 1:
+            print("Using mirrored strategy with ", selected_gpus)
+            strategy = tf.distribute.MirroredStrategy(selected_gpus)
+            print(strategy)
         else:
             strategy = tf.distribute.get_strategy()
 
@@ -96,16 +93,22 @@ class JobExecutor:
         compile_kwargs = {}
 
         # --- LOSS ---
-        loss_name = job_cfg.get("Loss", "none")
-        if loss_name in WS().losses:
-            loss_fn = load_loss(loss_name)
-        else:
-            loss_fn = getattr(tf.keras.losses, loss_name, None)
+        def get_loss(loss_name):
+            if loss_name in WS().losses:
+                loss_fn = load_loss(loss_name)
+            else:
+                loss_fn = getattr(tf.keras.losses, loss_name)
 
-        if loss_fn is not None:
             with strategy.scope():
-                loss = loss_fn(**job_cfg.get(loss_name, {}))
-                compile_kwargs["loss"] = loss
+                loss = loss_fn(**job_cfg.get(loss_name, {}), reduction=tf.keras.losses.Reduction.NONE)
+            return loss
+        
+        loss_spec = job_cfg.get("Loss", "none")
+        if isinstance(loss_spec, List):
+            loss = [get_loss(l) for l in loss_spec]
+        else:
+            loss = get_loss(loss_spec)
+        compile_kwargs["loss"] = loss
 
         # --- OPTIMIZER ---
         opt_name = job_cfg.get("Optimizer", "none")
