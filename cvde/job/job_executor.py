@@ -10,11 +10,13 @@ from cvde.workspace import Workspace as WS
 from .job_tracker import JobTracker
 import pathlib
 import os
-from typing import TYPE_CHECKING
-import docker
-import docker.models.containers
+import numpy as np
+from typing import TYPE_CHECKING, List
 import streamlit as st
+import tensorflow as tf
 import cvde
+
+import threading
 
 
 class JobExecutor:
@@ -25,66 +27,54 @@ class JobExecutor:
         """non-blocking launch job"""
         tracker = JobTracker.create(name)
 
-        client = docker.from_env()
-        # build image for CVDE if not exists
-        cvde_tag = "cvde/cvde"
-        # imgs = [image.tags[0].split(":")[0] for image in client.images.list()]
-        # if cvde_tag not in imgs:
-        with st.spinner("Building CVDE base image"):
-            path = str(pathlib.Path(__file__).parent.parent.parent.resolve())
-            client.images.build(
-                path=path,
-                tag=cvde_tag,
-                rm=True,
-                nocache=False,
-            )
-
-        ws_tag = f"{WS().name.lower()}/{WS().name.lower()}"
-
-        # build image for current project if not exists
-        # imgs = [image.tags[0].split(":")[0] for image in client.images.list()]
-        # if ws_tag not in imgs or True:
-        with st.spinner("Building docker image"):
-            client.images.build(path=".", tag=ws_tag, rm=True, nocache=False)
-
-        job_cfg = load_job(tracker.name)
-        mounts = {k: {"bind": k, "mode": "rw"} for k in job_cfg["mounts"]}
-        container = client.containers.run(
-            ws_tag,
-            f"execute {tracker.folder_name}",
-            detach=True,
-            remove=False,
-            device_requests=[docker.types.DeviceRequest(capabilities=[["gpu"]])],
-            volumes={
-                **mounts,
-                os.getcwd(): {"bind": "/ws", "mode": "rw"},  # bind current workspace
-            },
-            user=os.getuid(),
-            # working_dir="/ws",
-            name=tracker.folder_name,
+        job_thread = threading.Thread(
+            target=JobExecutor.run_job,
+            args=(tracker.folder_name,),
+            name="thread_" + tracker.unique_name,
         )
+        job_thread.start()
+        # launch non-blocking job
 
     @staticmethod
     def run_job(folder_name: str):
         tracker = JobTracker.from_log(folder_name)
+        tracker.set_thread_ident()
+
+        class Unbuffered:
+            def __init__(self, stream, file):
+                self.stream = stream
+                self.fp = open(file, "w")
+
+            def write(self, data):
+                self.stream.write(data)
+                self.stream.flush()
+                self.fp.write(data)
+                self.fp.flush()
+
+            def flush(self):
+                self.fp.flush()
+                self.stream.flush()
+
+        import sys
+
+        sys.stdout = Unbuffered(sys.stdout, tracker.stdout_file)
+        sys.stderr = Unbuffered(sys.stderr, tracker.stderr_file)
+
         job_cfg = load_job(tracker.name)
 
         import sys
 
         sys.path.append(".")  # otherwise import errors
 
-        import os
+        available_gpus = tf.config.experimental.list_physical_devices("GPU")
+        selected_gpus = [
+            x.name.split('physical_device:')[-1] for x in available_gpus if int(x.name.split(":")[-1]) in job_cfg["gpus"]
+        ]
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(x) for x in job_cfg["gpus"]])
-
-        import silence_tensorflow.auto
-        import tensorflow as tf
-
-        gpus = tf.config.experimental.list_physical_devices("GPU")
-        [tf.config.experimental.set_memory_growth(gpu, True) for gpu in gpus]
-
-        if len(gpus) > 1:
-            strategy = tf.distribute.MirroredStrategy()
+        if True or len(selected_gpus) > 1:
+            print("Using mirrored strategy with ", selected_gpus)
+            strategy = tf.distribute.MirroredStrategy(selected_gpus)
+            print(strategy)
         else:
             strategy = tf.distribute.get_strategy()
 
@@ -103,16 +93,22 @@ class JobExecutor:
         compile_kwargs = {}
 
         # --- LOSS ---
-        loss_name = job_cfg.get("Loss", "none")
-        if loss_name in WS().losses:
-            loss_fn = load_loss(loss_name)
-        else:
-            loss_fn = getattr(tf.keras.losses, loss_name, None)
+        def get_loss(loss_name):
+            if loss_name in WS().losses:
+                loss_fn = load_loss(loss_name)
+            else:
+                loss_fn = getattr(tf.keras.losses, loss_name)
 
-        if loss_fn is not None:
             with strategy.scope():
-                loss = loss_fn(**job_cfg.get(loss_name, {}))
-                compile_kwargs["loss"] = loss
+                loss = loss_fn(**job_cfg.get(loss_name, {}), reduction=tf.keras.losses.Reduction.NONE)
+            return loss
+        
+        loss_spec = job_cfg.get("Loss", "none")
+        if isinstance(loss_spec, List):
+            loss = [get_loss(l) for l in loss_spec]
+        else:
+            loss = get_loss(loss_spec)
+        compile_kwargs["loss"] = loss
 
         # --- OPTIMIZER ---
         opt_name = job_cfg.get("Optimizer", "none")
@@ -150,7 +146,9 @@ class JobExecutor:
 
             else:
                 cb_fn = getattr(tf.keras.callbacks, cb_name, None)
-            callbacks.append(cb_fn(**cb_kwargs))
+
+            if cb_fn is not None:
+                callbacks.append(cb_fn(**cb_kwargs))
 
         # print(f"Compiling Model with loss: {loss}, optimizer: {optimizer}, metrics: {metrics}")
         model.compile(**compile_kwargs)

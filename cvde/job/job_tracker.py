@@ -8,8 +8,8 @@ from dataclasses import dataclass
 import sys
 from typing import Any, List
 import shutil
-import docker
 import yaml
+import threading
 
 
 @dataclass
@@ -31,6 +31,9 @@ class JobTracker:
         self.root = Path("log/" + self.folder_name)
         self.var_root = self.root / "vars"
         self.weights_root = self.root / "weights"
+        self.ident = meta["ident"]
+        self.stdout_file = self.root / "stdout.txt"
+        self.stderr_file = self.root / "stderr.txt"
 
     @staticmethod
     def from_log(folder_name):
@@ -51,6 +54,11 @@ class JobTracker:
         weights_root = root / "weights"
         weights_root.mkdir(parents=True, exist_ok=True)
 
+        stdout_file = root / "stdout.txt"
+        stderr_file = root / "stderr.txt"
+        stdout_file.touch()
+        stderr_file.touch()
+
         # COPY JOB CONFIG OVER
         job_config_path = Path("jobs") / (job_name + ".yml")
         shutil.copy(job_config_path, root / "job.yml")
@@ -60,6 +68,7 @@ class JobTracker:
             "name": job_name,
             "started": started,
             "tags": [],
+            "ident": None,
         }
 
         with (root / "log.json").open("w") as F:
@@ -79,13 +88,9 @@ class JobTracker:
 
     @property
     def in_progress(self):
-        containers = docker.from_env().containers.list()
-        try:
-            ind = [x.name for x in containers].index(self.folder_name)
-        except ValueError:
-            return False
-
-        return containers[ind].status == "running"
+        # children = mp.active_children()
+        # return "thread_"+self.unique_name in [c.name for c in children]
+        return "thread_" + self.unique_name in [t.name for t in threading.enumerate()]
 
     @property
     def config(self):
@@ -94,28 +99,12 @@ class JobTracker:
         return meta
 
     def get_stderr(self):
-        content = (
-            docker.from_env()
-            .containers.get(self.folder_name)
-            .logs(stdout=False, stderr=True)
-            .decode()
-        )
-        return content
+        return self.stderr_file.read_text()
 
     def get_stdout(self):
-        line = (
-            docker.from_env()
-            .containers.get(self.folder_name)
-            .logs(stdout=True, stderr=False)
-            .decode()
-        )
-        return line
+        return self.stdout_file.read_text()
 
     def delete_log(self):
-        try:
-            docker.from_env().containers.get(self.folder_name).remove(force=True)
-        except Exception:
-            pass
         shutil.rmtree(self.root)
 
     def set_tags(self, tags):
@@ -124,6 +113,16 @@ class JobTracker:
         with (self.root / "log.json").open() as F:
             data = json.load(F)
         data["tags"] = tags
+        with (self.root / "log.json").open("w") as F:
+            json.dump(data, F, indent=2)
+
+    def set_thread_ident(self):
+        # ident = threading.get_ident()
+        ident = os.getpid()
+        self.ident = ident
+        with (self.root / "log.json").open() as F:
+            data = json.load(F)
+        data["ident"] = ident
         with (self.root / "log.json").open("w") as F:
             json.dump(data, F, indent=2)
 

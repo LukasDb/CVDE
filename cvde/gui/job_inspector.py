@@ -16,6 +16,7 @@ class JobInspector:
     def __init__(self) -> None:
         self.expanders = {}
         self.img_epochs = {}
+        self.expand_all = False
 
         self.runs = os.listdir("log")
         self.all_trackers = [JobTracker.from_log(run) for run in self.runs]
@@ -23,7 +24,7 @@ class JobInspector:
         st.subheader("Runs", anchor=False)
 
     def run(self):
-        trackers = self.get_selected_trackers()
+        trackers = self.get_selected_trackers() # also builds the sidebar
         trackers.sort(key=lambda t: t.started, reverse=True)
 
         # extract variable names
@@ -126,6 +127,7 @@ class JobInspector:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
             self.log_axes = st.checkbox("Logarithmic", value=True)
+            self.expand_all = st.checkbox("Expand all")
             selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
             cols = st.columns(2)
             cols[0].subheader("Logged runs", anchor=False)
@@ -167,7 +169,7 @@ class JobInspector:
 
     def get_expander(self, var_name, default=None):
         if var_name not in self.expanders:
-            self.expanders[var_name] = exp = st.expander(var_name)
+            self.expanders[var_name] = exp = st.expander(var_name,expanded=self.expand_all)
 
             if default is not None:
                 with exp:
