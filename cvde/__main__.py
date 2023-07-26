@@ -47,8 +47,8 @@ def gui(port):
         "true",
         "--server.port",
         port,
-        "--theme.base",
-        "dark",
+        #"--theme.base",
+        #"dark",
     ]
 
     proc = subprocess.Popen(["streamlit", "run", gui_file, *streamlit_config])
