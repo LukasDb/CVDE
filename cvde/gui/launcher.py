@@ -1,14 +1,15 @@
 import time
 import subprocess
-from cvde.workspace import Workspace as WS
-from cvde.workspace import ModuleExistsError
-from cvde.job.job_executor import JobExecutor
 import streamlit as st
 import streamlit_ace as st_ace
 import pandas as pd
 from typing import OrderedDict
-from cvde.workspace_tools import load_job
 import pathlib
+
+import cvde
+from cvde.workspace import Workspace as WS
+from cvde.workspace import ModuleExistsError
+import cvde.workspace_tools as ws_tools
 
 
 class Launcher:
@@ -20,72 +21,36 @@ class Launcher:
         "min_lines": 5,
         "tab_size": 2,
     }
+
     def __init__(self) -> None:
-        self.jobs = list(WS().jobs)
-        self.jobs.sort()
+        self.configs = list(WS().configs)
+        self.configs.sort()
+        if "jobs" not in st.session_state:
+            st.session_state["jobs"] = []
 
     def run(self):
         buttons = st.columns([1, 1, 1, 1, 1])
-        job_name = buttons[0].selectbox("Job", WS().jobs, label_visibility='collapsed')
-        if buttons[1].button("Add Job",  use_container_width=True):
-            self.add_job()
-        if buttons[2].button("Duplicate", use_container_width=True):
-            self.duplicate_job(job_name)
-        if buttons[3].button("Delete", use_container_width=True):
-            self.delete_job(job_name)
-        if buttons[4].button("Launch", use_container_width=True):
-            self.launch_job(job_name)
+        job_names = [x.__name__ for x in WS().jobs]
+        job_name = buttons[0].selectbox("Job", job_names, label_visibility="collapsed")
+        config_name = buttons[1].selectbox("Config", WS().configs, label_visibility="collapsed")
 
-        job_path = pathlib.Path("jobs/" + job_name + ".yml")
-        with job_path.open() as F:
-            job = F.read()
-        new_job = st_ace.st_ace(job, **self.ace_options, key='ace_'+job_name)
-        if new_job != job:
-            with job_path.open("w") as F:
-                F.write(new_job)
+        if buttons[2].button("Launch", use_container_width=True):
+            self.launch_job(job_name, config_name)
 
-    def duplicate_job(self, job_name):
-        job_path = pathlib.Path("jobs/" + job_name + ".yml")
-        new_job_path = pathlib.Path("jobs/" + job_name + "_copy.yml")
-        with job_path.open() as F:
-            job = F.read()
+        if config_name is None:
+            return
 
-        with new_job_path.open("w") as F:
-            F.write(job)
+        config_path = pathlib.Path("configs/" + config_name + ".yml")
+        with config_path.open() as F:
+            config = F.read()
+        new_config = st_ace.st_ace(config, **self.ace_options, key="ace_" + config_name)
+        if new_config != config:
+            with config_path.open("w") as F:
+                F.write(new_config)
 
-    def launch_job(self, job_name):
-        JobExecutor.launch_job(job_name)
+    def launch_job(self, job_name, config_name):
+        job_fn = cvde.job.Job.load_job(job_name)
+        job = job_fn(config_name)
+        st.session_state["jobs"].append(job)
+        job.launch()
         st.info(f"Job {job_name} launched.")
-
-    
-    def delete_job(self, job_name):
-        job_path = pathlib.Path("jobs/" + job_name + ".yml")
-        job_path.unlink()
-        time.sleep(0.5)
-        st.experimental_rerun()
-
-
-
-    def update_config(self, name, type):
-        new_job_config = self.jobs[name]
-        val = st.session_state[name + "__" + type]
-        new_job_config[type] = val
-        self.delete_job(name)
-        WS().new("jobs", name, job=new_job_config)
-
-    def change_name(self, name):
-        job = self.jobs[name]
-        new_name = st.session_state[name + "name"]
-        try:
-            WS().new("jobs", new_name, job=job)
-            self.delete_job(name)
-        except ModuleExistsError:
-            st.error("Job already exists! Rename previous copy to a unique name.")
-
-
-
-
-    def add_empty_job(self):
-        WS().new("jobs", "New Job")
-
-

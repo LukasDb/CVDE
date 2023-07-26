@@ -7,7 +7,8 @@ import streamlit_scrollable_textbox as stx
 import subprocess
 from datetime import datetime
 
-from cvde.job import job_tracker as job
+from typing import List
+from cvde.job import Job
 from cvde.workspace import Workspace as WS
 
 import multiprocessing as mp
@@ -15,16 +16,22 @@ import multiprocessing as mp
 
 def dashboard():
     try:
-        runs = os.listdir("log")
+        running_jobs: List[Job] = st.session_state["jobs"]
+        # runs = os.listdir("log")
+        # trackers = [job.JobTracker.from_log(run) for run in runs]
+        # trackers = [t for t in trackers if t.in_progress]
+        # trackers.sort(key=lambda t: t.started, reverse=True)
+    except KeyError:
+        running_jobs = []
+        # trackers = []
 
-        trackers = [job.JobTracker.from_log(run) for run in runs]
-        trackers = [t for t in trackers if t.in_progress]
-        trackers.sort(key=lambda t: t.started, reverse=True)
-    except FileNotFoundError:
-        trackers = []
+    for job in running_jobs:
+        if not job.tracker.in_progress:
+            st.session_state["jobs"].remove(job)
 
     with st.expander("Runs", expanded=True):
-        for t in trackers:
+        for j in running_jobs:
+            t = j.tracker
             c1, c2 = st.columns([8, 1])
             c1.markdown(f"**{t.display_name}**")
 
@@ -35,7 +42,7 @@ def dashboard():
 
             if st.session_state.get("confirm_kill_job_" + t.unique_name, False):
                 st.warning(f"Killing {t.name}")
-                os.kill(t.ident, signal.SIGKILL)
+                j.stop()
 
                 time.sleep(0.5)
                 st.experimental_rerun()

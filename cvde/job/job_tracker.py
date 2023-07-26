@@ -41,7 +41,7 @@ class JobTracker:
         return tracker
 
     @staticmethod
-    def create(job_name: str):
+    def create(job_name: str, config_name: str):
         """creates folder structure for run"""
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
@@ -60,7 +60,7 @@ class JobTracker:
         stderr_file.touch()
 
         # COPY JOB CONFIG OVER
-        job_config_path = Path("jobs") / (job_name + ".yml")
+        job_config_path = Path("configs") / (config_name + ".yml")
         shutil.copy(job_config_path, root / "job.yml")
 
         started = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -88,8 +88,6 @@ class JobTracker:
 
     @property
     def in_progress(self):
-        # children = mp.active_children()
-        # return "thread_"+self.unique_name in [c.name for c in children]
         return "thread_" + self.unique_name in [t.name for t in threading.enumerate()]
 
     @property

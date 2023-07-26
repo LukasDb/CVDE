@@ -1,12 +1,15 @@
 from typing import Any, Iterable, Dict
 from abc import abstractmethod, ABC
-import numpy as np
-from typing import TYPE_CHECKING
+import cvde.workspace_tools as ws_tools
 
 
-class Dataset:
+class Dataset(ABC):
     def __iter__(self):
         return self
+
+    @staticmethod
+    def load_dataset(__dataset_name) -> type["Dataset"]:
+        return ws_tools.load_module("datasets", __dataset_name)
 
     @abstractmethod
     def visualize_example(self, example) -> None:
@@ -20,7 +23,7 @@ class Dataset:
         pass
 
     @abstractmethod
-    def __len__(self)->int:
+    def __len__(self) -> int:
         pass
 
     @abstractmethod

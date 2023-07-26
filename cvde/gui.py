@@ -1,5 +1,7 @@
+import sys
 import os
 
+import silence_tensorflow.auto
 import tensorflow as tf
 
 gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -18,6 +20,8 @@ import requests
 
 
 def main():
+    sys.path.append(os.getcwd())
+
     st.set_page_config(
         layout="wide",
         page_title=WS().name,
@@ -37,7 +41,6 @@ def main():
         "Dashboard",
         "Data",
         "Models",
-        # "Configurator",
         "Jobs",
         "Inspector",
         "Deployment",
@@ -78,6 +81,7 @@ def main():
         dashboard()
 
     elif sel_p == "Data":
+        title("Data Explorer")
         from cvde.gui.data_explorer import data_explorer
 
         data_explorer()
@@ -88,13 +92,6 @@ def main():
 
         me = ModelExplorer()
         me.run()
-
-    elif sel_p == "Configurator":
-        title("Configurator")
-        from cvde.gui.job_editor import JobEditor
-
-        ce = JobEditor()
-        ce.run()
 
     elif sel_p == "Jobs":
         title("Jobs")

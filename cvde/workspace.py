@@ -5,15 +5,13 @@ import logging
 import importlib
 from datetime import datetime
 from enum import Enum, auto
-import sys
 from typing import Any, List, Callable
 import pathlib
 import inspect
 import tensorflow as tf
 
 import cvde
-
-sys.path.append(os.getcwd())
+import cvde.workspace_tools as ws_tools
 
 
 class ModuleExistsError(Exception):
@@ -51,10 +49,8 @@ class Workspace:
             "models",
             "datasets",
             "jobs",
-            "optimizers",
             "losses",
-            "callbacks",
-            "metrics",
+            "configs",
         ]
         for folder in folders:
             os.makedirs(folder)
@@ -67,79 +63,35 @@ class Workspace:
         self.name = state["name"]
         self.created = state["created"]
 
-    def _list_modules(self, base_module: str, condition: Callable[[Any], bool]):
-        loaded = sys.modules.copy()
-        for mod in loaded:
-            if mod.startswith(base_module):
-                del sys.modules[mod]
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
-        )
-        datasets = []
-
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            try:
-                importlib.reload(module)
-            except ImportError:
-                pass
-            datasets.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if condition(v) and not k.startswith("_")
-                ]
-            )
-        return datasets
-
     @property
     def datasets(self):
-        return self._list_modules(
+        return ws_tools.list_modules(
             "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
         )
 
     @property
     def models(self):
-        return self._list_modules(
+        return ws_tools.list_modules(
             "models", lambda v: inspect.isclass(v) and issubclass(v, tf.keras.Model)
         )
 
     @property
+    def configs(self):
+        dir = "configs"
+        configs = list(x.stem for x in pathlib.Path(dir).glob("*.yml"))
+        return configs
+
+    @property
     def jobs(self):
-        dir = "jobs"
-        jobs = list(x.stem for x in pathlib.Path(dir).glob("*.yml"))
-        return jobs
+        return ws_tools.list_modules(
+            "jobs", lambda v: inspect.isclass(v) and issubclass(v, cvde.job.Job)
+        )
 
     @property
     def losses(self):
-        return self._list_modules(
+        return ws_tools.list_modules(
             "losses",
             lambda v: inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss),
-        )
-
-    @property
-    def callbacks(self):
-        return self._list_modules(
-            "callbacks",
-            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.callbacks.Callback),
-        )
-
-    @property
-    def metrics(self):
-        return self._list_modules(
-            "metrics",
-            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.metrics.Metric),
-        )
-
-    @property
-    def optimizers(self):
-        return self._list_modules(
-            "optimizers",
-            lambda v: inspect.isclass(v)
-            and issubclass(v, tf.keras.optimizers.Optimizer),
         )
 
     def summary(self) -> str:
@@ -151,11 +103,18 @@ class Workspace:
         def print_entries(type):
             entries = ""
             for m in self.__getattribute__(type):
-                entries += f"├───{m}\n"
+                if hasattr(m, "__name__"):
+                    name = m.__name__
+                else:
+                    name = m
+                entries += f"├───{name}\n"
             return entries
 
         out += "\nJobs:\n"
         out += print_entries("jobs")
+
+        out += "\nConfigs:\n"
+        out += print_entries("configs")
 
         out += "\nDataloaders:\n"
         out += print_entries("datasets")
@@ -166,10 +125,5 @@ class Workspace:
         out += "\nLosses:\n"
         out += print_entries("losses")
 
-        out += "\nMetrics:\n"
-        out += print_entries("metrics")
-
-        out += "\nCallbacks:\n"
-        out += print_entries("callbacks")
 
         return out

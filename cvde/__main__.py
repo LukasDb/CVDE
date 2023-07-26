@@ -2,9 +2,9 @@ import logging
 import os
 import subprocess
 import click
+from pathlib import Path
 
 from cvde.workspace import Workspace as WS
-from cvde.job.job_executor import JobExecutor
 
 
 @click.group()
@@ -17,7 +17,8 @@ def run():
 @click.argument("name")
 def execute(name):
     "Execute a given task"
-    JobExecutor.run_job(name)
+    raise NotImplementedError
+    #JobExecutor.run_job(name)
 
 
 @run.command()
@@ -41,17 +42,22 @@ def init(name):
 )
 def gui(port):
     "Run CVDE GUI in your browser"
-    gui_file = os.path.join(os.path.dirname(__file__), "gui.py")
+
+    gui_file = Path(__file__).parent / "gui.py"
+
     streamlit_config = [
         "--server.runOnSave",
         "true",
         "--server.port",
         port,
-        #"--theme.base",
-        #"dark",
+        # "--theme.base",
+        # "dark",
     ]
 
-    proc = subprocess.Popen(["streamlit", "run", gui_file, *streamlit_config])
+    proc = subprocess.Popen(
+        ["streamlit", "run", str(gui_file.resolve()), *streamlit_config],
+        cwd=os.getcwd(),
+    )
 
     try:
         while proc.poll() is None:
