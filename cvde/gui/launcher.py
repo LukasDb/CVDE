@@ -25,8 +25,6 @@ class Launcher:
     def __init__(self) -> None:
         self.configs = list(WS().configs)
         self.configs.sort()
-        if "jobs" not in st.session_state:
-            st.session_state["jobs"] = []
 
     def run(self):
         buttons = st.columns([1, 1, 1, 1, 1])
@@ -50,7 +48,6 @@ class Launcher:
 
     def launch_job(self, job_name, config_name):
         job_fn = cvde.job.Job.load_job(job_name)
-        job = job_fn(config_name)
-        st.session_state["jobs"].append(job)
+        job = job_fn(config_name=config_name)
         job.launch()
         st.info(f"Job {job_name} launched.")

@@ -47,9 +47,6 @@ def load_module(base_module, module_name):
     return modules[0]
 
 
-
-
-
 def load_model(__model_name) -> type[tf.keras.Model]:
     return load_module("models", __model_name)
 

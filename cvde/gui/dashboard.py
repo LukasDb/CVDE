@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime
 
 from typing import List
-from cvde.job import Job
+from cvde.job import Job, JobTracker
 from cvde.workspace import Workspace as WS
 
 import multiprocessing as mp
@@ -16,18 +16,14 @@ import multiprocessing as mp
 
 def dashboard():
     try:
-        running_jobs: List[Job] = st.session_state["jobs"]
-        # runs = os.listdir("log")
-        # trackers = [job.JobTracker.from_log(run) for run in runs]
-        # trackers = [t for t in trackers if t.in_progress]
-        # trackers.sort(key=lambda t: t.started, reverse=True)
+        runs = os.listdir("log")
+        trackers = [JobTracker.from_log(run) for run in runs]
+        trackers = [t for t in trackers if t.in_progress]
+        trackers.sort(key=lambda t: t.started, reverse=True)
     except KeyError:
-        running_jobs = []
-        # trackers = []
-
-    for job in running_jobs:
-        if not job.tracker.in_progress:
-            st.session_state["jobs"].remove(job)
+        trackers = []
+        
+    running_jobs = [Job.load_job(t.name)(folder_name=t.folder_name) for t in trackers]
 
     with st.expander("Runs", expanded=True):
         for j in running_jobs:
