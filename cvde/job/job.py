@@ -4,6 +4,7 @@ import cvde.workspace_tools as ws_tools
 from cvde.workspace import Workspace as WS
 import threading
 from typing import Union
+import queue
 
 
 class JobTerminatedException(Exception):
@@ -23,21 +24,23 @@ class Job(ABC):
             self.config = ws_tools.load_config(config_name)
             self.tracker = JobTracker.create(self.name, config_name)
 
-        self._stop_queue = WS()._stop_queue
+        self._stop_queue = WS().stop_queue
+        self._stop_lock = WS().lock
 
     @staticmethod
     def load_job(__job_name) -> type["Job"]:
         return ws_tools.load_module("jobs", __job_name)
 
     def stop(self):
-        print("Job stopped: ", self.name)
-        self._stop_queue.put(self.tracker.ident)
+        with self._stop_lock:
+            self._stop_queue.add(self.tracker.ident)
 
     @property
     def is_stopped(self):
-        with self._stop_queue.mutex:
-            return self.tracker.ident in self._stop_queue.queue
-            
+        with self._stop_lock:
+            if self.tracker.ident in self._stop_queue:
+                self._stop_queue.remove(self.tracker.ident)
+                return True
 
     def launch(self):
         """non-blocking launch job"""
