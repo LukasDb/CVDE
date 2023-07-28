@@ -1,5 +1,6 @@
 import json
 import yaml
+import numpy as np
 import os
 import shutil
 import logging
@@ -11,10 +12,12 @@ import pathlib
 import inspect
 import tensorflow as tf
 import sys
-import queue
+import threading
+
 
 import cvde
 import cvde.workspace_tools as ws_tools
+
 
 class ModuleExistsError(Exception):
     pass
@@ -22,6 +25,8 @@ class ModuleExistsError(Exception):
 
 class Workspace:
     stop_queue = None
+    lock = None
+
     _instance = None
     FOLDERS = [
         "models",
@@ -34,7 +39,8 @@ class Workspace:
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(Workspace, cls).__new__(cls, *args, **kwargs)
-            cls._stop_queue = queue.Queue()
+            cls.stop_queue = set()
+            cls.lock = threading.Lock()
         return cls._instance
 
     def __init__(self) -> None:
@@ -108,7 +114,7 @@ class Workspace:
                 }
             )
 
-        pathlib.Path('.vscode/').mkdir(exist_ok=True)
+        pathlib.Path(".vscode/").mkdir(exist_ok=True)
         with pathlib.Path(".vscode/launch.json").open("w") as F:
             json.dump(launch_config, F, indent=4)
 
@@ -187,5 +193,6 @@ class Workspace:
         # reload all modules in Workspace
         loaded = sys.modules.copy()
         for mod in loaded:
-            if mod in self.FOLDERS:
-                importlib.reload(sys.modules[mod])
+            for folder in self.FOLDERS:
+                if mod.startswith(folder) or mod == folder:
+                    importlib.reload(sys.modules[mod])

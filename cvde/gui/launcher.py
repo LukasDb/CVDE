@@ -47,6 +47,7 @@ class Launcher:
                 F.write(new_config)
 
     def launch_job(self, job_name, config_name):
+        WS().reload_modules()
         job_fn = cvde.job.Job.load_job(job_name)
         job = job_fn(config_name=config_name)
         job.launch()

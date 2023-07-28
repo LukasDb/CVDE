@@ -44,14 +44,14 @@ def dashboard():
                 st.experimental_rerun()
 
             try:
-                stdout = "\n".join(t.get_stdout().split("\n")[-3:])
+                stdout = "\n".join(t.get_stdout().split("\n")[-1:])
                 st.text("stdout")
                 st.code(stdout)
             except Exception:
                 pass
 
             try:
-                stderr = "\n".join(t.get_stderr().split("\n")[-5:])
+                stderr = "\n".join(t.get_stderr().split("\n")[-1:])
                 st.text("stderr")
                 st.code(stderr)
             except Exception:

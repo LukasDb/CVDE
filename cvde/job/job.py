@@ -44,9 +44,7 @@ class Job(ABC):
 
     def launch(self):
         """non-blocking launch job"""
-        job_thread = threading.Thread(
-            target=self._run, name="thread_" + self.tracker.unique_name
-        )
+        job_thread = threading.Thread(target=self._run, name="thread_" + self.tracker.unique_name)
         job_thread.start()
 
     def _run(self):
@@ -71,10 +69,6 @@ class Job(ABC):
 
         sys.stdout = Unbuffered(sys.stdout, self.tracker.stdout_file)
         sys.stderr = Unbuffered(sys.stderr, self.tracker.stderr_file)
-
-        # reload potentially changed modules
-        WS().reload_modules()
-
         self.run()
 
         print("Job finished: ", self.name)

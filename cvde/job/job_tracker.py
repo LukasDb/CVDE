@@ -1,6 +1,5 @@
-import pickle
 import json
-import streamlit as st
+import pickle
 from datetime import datetime
 import os
 from pathlib import Path
@@ -130,24 +129,20 @@ class JobTracker:
         return sorted(var_names)
 
     def read_var(self, var: str) -> List[LogEntry]:
-        var_name = var + ".pkl"
-        with (self.var_root.joinpath(var_name)).open("rb") as F:
-            data: List[LogEntry] = pickle.load(F)
+        files = sorted(list((self.var_root / var).iterdir()))
+        data = [pickle.load(F.open('rb')) for F in files]
+        data = [LogEntry(**d) for d in data]
         return data
 
     def log(self, name, var, index=None):
         """log variable"""
-        var_path = self.var_root.joinpath(name + ".pkl")
-        try:
-            with var_path.open("rb") as F:
-                data = pickle.load(F)
-        except FileNotFoundError:
-            data = []
+        var_folder = self.var_root / name
+        var_folder.mkdir(exist_ok=True)
 
-        index = len(data) if index is None else index
+        index = len(var_folder.iterdir()) if index is None else index
 
-        new_data = LogEntry(t=datetime.now(), index=index, data=var)
-        data.append(new_data)
+        var_path = self.var_root / name / f"{index:06}.pkl"
 
+        data = {"t": datetime.now(), "index": index, "data": var}
         with var_path.open("wb") as F:
             pickle.dump(data, F)
