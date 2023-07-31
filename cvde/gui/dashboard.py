@@ -46,14 +46,14 @@ def dashboard():
             try:
                 stdout = "\n".join(t.get_stdout().split("\n")[-1:])
                 st.text("stdout")
-                st.code(stdout)
+                st.code(stdout, language="html")
             except Exception:
                 pass
 
             try:
                 stderr = "\n".join(t.get_stderr().split("\n")[-1:])
                 st.text("stderr")
-                st.code(stderr)
+                st.code(stderr, language="html")
             except Exception:
                 pass
 
@@ -61,10 +61,10 @@ def dashboard():
 
     with st.expander("Workspace Overview"):
         st.subheader("Workspace Overview", anchor=False)
-        st.code(WS().summary())
+        st.code(WS().summary(), language="html")
 
     with st.expander("Device Status", expanded=True):
         smi = subprocess.run(["nvidia-smi"], capture_output=True).stdout.decode()
 
         st.subheader("Device Status", anchor=False)
-        st.code(smi)
+        st.code(smi, language="html")

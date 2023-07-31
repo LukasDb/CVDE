@@ -9,3 +9,4 @@ streamlit_ace
 streamlit_scrollable_textbox
 pyyaml
 plotly
+colorama

@@ -4,7 +4,9 @@ import cvde.workspace_tools as ws_tools
 from cvde.workspace import Workspace as WS
 import threading
 from typing import Union
+import contextlib
 import queue
+import sys
 
 
 class JobTerminatedException(Exception):
@@ -49,30 +51,14 @@ class Job(ABC):
 
     def _run(self):
         self.tracker.set_thread_ident()
+        sys.stdout.register_new_out(self.tracker.stdout_file)
+        sys.stderr.register_new_out(self.tracker.stderr_file)
 
-        class Unbuffered:
-            def __init__(self, stream, file):
-                self.stream = stream
-                self.fp = open(file, "w")
-
-            def write(self, data):
-                self.stream.write(data)
-                self.stream.flush()
-                self.fp.write(data)
-                self.fp.flush()
-
-            def flush(self):
-                self.fp.flush()
-                self.stream.flush()
-
-        import sys
-
-        sys.stdout = Unbuffered(sys.stdout, self.tracker.stdout_file)
-        sys.stderr = Unbuffered(sys.stderr, self.tracker.stderr_file)
         self.run()
-
         print("Job finished: ", self.name)
 
     @abstractmethod
     def run(self):
         pass
+
+
