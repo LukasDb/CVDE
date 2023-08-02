@@ -42,20 +42,15 @@ class JobInspector:
         var_names = np.unique(var_names)
 
         if len(trackers) > 0:
-            try:
-                num_epochs = list([len(x.read_var(x.vars[0])) for x in trackers])
-            except Exception:
-                num_epochs = [0]
-            self.max_epoch = max(num_epochs)
-
             cols = st.columns(len(trackers))
             for tracker, col in zip(trackers, cols):
                 with col:
                     tags = st_tags(
                         value=tracker.tags,
-                        label="Tags",
+                        label=f"{tracker.display_name}",
                         suggestions=list(self.tags),
                         key="tags_" + tracker.unique_name,
+                        text="Add tags..."
                     )
                     for tag in tags:
                         self.tags.add(tag)
@@ -89,14 +84,14 @@ class JobInspector:
                 if run_data[0].is_image:
                     exp = self.get_expander(var_name)
                     # select index
-                    if self.max_epoch > 1:
+                    if len(y)>1:
                         epoch = exp.slider(
-                            "select",
+                            "Select",
                             min_value=0,
                             label_visibility="hidden",
-                            max_value=self.max_epoch - 1,
-                            key="epch_slider" + var_name + t.unique_name,
-                            value=self.max_epoch - 1,
+                            max_value=len(y) - 1,
+                            value=len(y) - 1,
+                            key = "num_epoch_"+var_name+t.unique_name
                         )
                     else:
                         epoch = 0

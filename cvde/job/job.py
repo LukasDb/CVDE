@@ -5,6 +5,7 @@ from cvde.workspace import Workspace as WS
 import threading
 from typing import Union
 import sys
+from typing import List
 
 
 class JobTerminatedException(Exception):
@@ -18,6 +19,7 @@ class Job(ABC):
         run_name: Union[str, None] = None,
         config_name: Union[str, None] = None,
         folder_name: Union[str, None] = None,
+        tags: List[str] = []
     ):
         self.name = self.__class__.__name__
         if folder_name is not None and config_name is None:
@@ -28,6 +30,7 @@ class Job(ABC):
         elif folder_name is None and config_name is not None and run_name is not None:
             self.config = ws_tools.load_config(config_name)
             self.tracker = JobTracker.create(self.name, config_name, run_name=run_name)
+            self.tracker.set_tags(tags)
 
         self._stop_queue = WS().stop_queue
 
@@ -38,7 +41,6 @@ class Job(ABC):
     def stop(self):
         self._stop_queue.add(self.tracker.ident)
 
-    @property
     def is_stopped(self):
         if self.tracker.ident in self._stop_queue:
             self._stop_queue.remove(self.tracker.ident)
