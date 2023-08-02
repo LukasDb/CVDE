@@ -8,10 +8,6 @@ import sys
 from typing import List
 
 
-class JobTerminatedException(Exception):
-    pass
-
-
 class Job(ABC):
     def __init__(
         self,

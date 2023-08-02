@@ -16,24 +16,57 @@ class JobInspector:
     def __init__(self) -> None:
         self.expanders: Dict[str, Type] = {}
         self.expand_all = False
-
         self.runs = os.listdir("log")
-        self.all_trackers = [JobTracker.from_log(run) for run in self.runs]
-        self.all_trackers.sort(key=lambda t: t.started, reverse=True)
+        all_trackers = [JobTracker.from_log(run) for run in self.runs]
+        all_trackers.sort(key=lambda t: t.started, reverse=True)
 
         if "tags" not in st.session_state:
             st.session_state.tags = set()
-
         self.tags: Set[str] = st.session_state.tags
         self.tags.clear()
-        for t in self.all_trackers:
+        for t in all_trackers:
             for tag in t.tags:
                 self.tags.add(tag)
+
+        with st.sidebar:
+            st.subheader("Settings")
+            self.use_time = st.checkbox("Use actual time")
+            self.log_axes = st.checkbox("Logarithmic", value=True)
+            self.expand_all = st.checkbox("Expand all")
+            selected_tags = st.multiselect("Filter by tags", options=self.tags)
+            cols = st.columns(2)
+            cols[0].subheader("Logged runs", anchor=False)
+            all_selected = cols[1].checkbox("Select all")
+
+        self.active_trackers: List[JobTracker] = []
+        for t in all_trackers:
+            has_a_selected_tag = any(tag in selected_tags for tag in t.tags)
+            if len(selected_tags) > 0 and not has_a_selected_tag:
+                continue
+            if st.sidebar.checkbox(t.display_name, value=all_selected, key=t.unique_name):
+                self.active_trackers.append(t)
+
+        with st.sidebar:
+            [st.text("") for i in range(10)]  # vspacing
+            delete_button = st.empty()
+            clicked_delete = delete_button.button("Delete selected")
+            if clicked_delete:
+                delete_button.button("Confirm?", key="confirm_delete_jobs")
+
+            if st.session_state.get("confirm_delete_jobs", False):
+                for t in self.active_trackers:
+                    if t.in_progress:
+                        st.error(f"Can't delete running job {t.name}")
+                    else:
+                        t.delete_log()
+                time.sleep(0.5)
+                st.experimental_rerun()
 
         st.subheader("Runs", anchor=False)
 
     def run(self):
-        trackers = self.get_selected_trackers()  # also builds the sidebar
+        # trackers = self.get_selected_trackers()  # also builds the sidebar
+        trackers = self.active_trackers
         trackers.sort(key=lambda t: t.started, reverse=True)
 
         # extract variable names
@@ -50,7 +83,7 @@ class JobInspector:
                         label=f"{tracker.display_name}",
                         suggestions=list(self.tags),
                         key="tags_" + tracker.unique_name,
-                        text="Add tags..."
+                        text="Add tags...",
                     )
                     for tag in tags:
                         self.tags.add(tag)
@@ -84,14 +117,14 @@ class JobInspector:
                 if run_data[0].is_image:
                     exp = self.get_expander(var_name)
                     # select index
-                    if len(y)>1:
+                    if len(y) > 1:
                         epoch = exp.slider(
                             "Select",
                             min_value=0,
                             label_visibility="hidden",
                             max_value=len(y) - 1,
                             value=len(y) - 1,
-                            key = "num_epoch_"+var_name+t.unique_name
+                            key="num_epoch_" + var_name + t.unique_name,
                         )
                     else:
                         epoch = 0
@@ -143,48 +176,6 @@ class JobInspector:
                     fontFamily="monospace",
                     key=tracker.unique_name + "_stderr",
                 )
-
-    def get_selected_trackers(self) -> List[JobTracker]:
-        # assemble settings in sidebar
-        with st.sidebar:
-            st.subheader("Settings")
-            self.use_time = st.checkbox("Use actual time")
-            self.log_axes = st.checkbox("Logarithmic", value=True)
-            self.expand_all = st.checkbox("Expand all")
-            selected_tags = st.multiselect("Filter by tags", options=self.tags)
-            cols = st.columns(2)
-            cols[0].subheader("Logged runs", anchor=False)
-            all_selected = cols[1].checkbox("Select all")
-
-        # filter by tags
-        if len(selected_tags) > 0:
-            self.all_trackers = [
-                t for t in self.all_trackers if any(tag in selected_tags for tag in t.tags)
-            ]
-
-        # gui + select runs
-        trackers: List[JobTracker] = []
-        for tracker in self.all_trackers:
-            with st.sidebar:
-                if st.checkbox(tracker.display_name, value=all_selected, key=tracker.unique_name):
-                    trackers.append(tracker)
-
-        with st.sidebar:
-            [st.text("") for i in range(10)]
-            delete_button = st.empty()
-            clicked_delete = delete_button.button("Delete selected")
-            if clicked_delete:
-                delete_button.button("Confirm?", key="confirm_delete_jobs")
-
-            if st.session_state.get("confirm_delete_jobs", False):
-                for t in trackers:
-                    if t.in_progress:
-                        st.error(f"Can't delete running job {t.name}")
-                    else:
-                        t.delete_log()
-                time.sleep(0.5)
-                st.experimental_rerun()
-        return trackers
 
     def get_expander(self, var_name, default=None):
         if var_name not in self.expanders:
