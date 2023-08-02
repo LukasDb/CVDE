@@ -8,7 +8,8 @@ from pathlib import Path
 import pickle
 import numpy as np
 import multiprocessing as mp
-from tqdm import tqdm
+import tqdm
+import psutil
 
 
 class Dataset(ABC):
@@ -72,22 +73,37 @@ class Dataset(ABC):
 
         jobs = [(start, stop, preprocess_folder) for start, stop in zip(starts, stops)]
 
-        # for job in jobs:
-        #     self._cache_index_range(*job)
         try:
             mp.set_start_method("spawn")
         except RuntimeError:
             pass
-        n_workers = min(mp.cpu_count(), 16)
-        n_jobs = len(jobs)
-        pool = mp.Pool(n_workers)
-        pool.starmap(
-            self._cache_index_range,
-            tqdm(jobs, desc="Caching"),
-            chunksize=max(1, n_jobs // n_workers),
-        )
-        pool.close()
-        pool.join()
+
+        n_workers = min(psutil.cpu_count(logical=False), 16)
+        job_queue: mp.Queue = mp.Queue(maxsize=n_workers)
+
+        workers = [mp.Process(target=self.process, args=(job_queue,)) for _ in range(n_workers)]
+
+        for worker in tqdm.tqdm(workers, desc="Starting workers", ascii=False):
+            worker.start()
+
+        with tqdm.tqdm(total=len(self), desc="Caching", smoothing=0, ascii=False) as bar:
+            for job in jobs:
+                job_queue.put(job)
+                bar.update(job[1] - job[0])
+
+        for _ in range(n_workers):
+            job_queue.put(None)
+
+        for worker in workers:
+            worker.join()
+
+    def process(self, process_queue: mp.Queue):
+        """get queue stop when receive None, otherwise run _cache_index_range"""
+        while True:
+            job = process_queue.get()
+            if job is None:
+                break
+            self._cache_index_range(*job)
 
     def _cache_index_range(
         self, start, stop, preprocess_folder: Path  # shard_every_n_datapoints: int

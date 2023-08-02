@@ -4,8 +4,6 @@ import cvde.workspace_tools as ws_tools
 from cvde.workspace import Workspace as WS
 import threading
 from typing import Union
-import contextlib
-import queue
 import sys
 
 
@@ -15,34 +13,38 @@ class JobTerminatedException(Exception):
 
 class Job(ABC):
     def __init__(
-        self, *, config_name: Union[str, None] = None, folder_name: Union[str, None] = None
+        self,
+        *,
+        run_name: Union[str, None] = None,
+        config_name: Union[str, None] = None,
+        folder_name: Union[str, None] = None,
     ):
         self.name = self.__class__.__name__
-
         if folder_name is not None and config_name is None:
             self.tracker = JobTracker.from_log(folder_name)
             self.config = self.tracker.config
-        elif folder_name is None and config_name is not None:
+            self.name = self.tracker.name
+
+        elif folder_name is None and config_name is not None and run_name is not None:
             self.config = ws_tools.load_config(config_name)
-            self.tracker = JobTracker.create(self.name, config_name)
+            self.tracker = JobTracker.create(self.name, config_name, run_name=run_name)
 
         self._stop_queue = WS().stop_queue
-        self._stop_lock = WS().lock
 
     @staticmethod
     def load_job(__job_name) -> type["Job"]:
         return ws_tools.load_module("jobs", __job_name)
 
     def stop(self):
-        with self._stop_lock:
-            self._stop_queue.add(self.tracker.ident)
+        self._stop_queue.add(self.tracker.ident)
 
     @property
     def is_stopped(self):
-        with self._stop_lock:
-            if self.tracker.ident in self._stop_queue:
-                self._stop_queue.remove(self.tracker.ident)
-                return True
+        if self.tracker.ident in self._stop_queue:
+            self._stop_queue.remove(self.tracker.ident)
+            return True
+        else:
+            return False
 
     def launch(self):
         """non-blocking launch job"""
@@ -53,12 +55,9 @@ class Job(ABC):
         self.tracker.set_thread_ident()
         sys.stdout.register_new_out(self.tracker.stdout_file)
         sys.stderr.register_new_out(self.tracker.stderr_file)
-
         self.run()
         print("Job finished: ", self.name)
 
     @abstractmethod
     def run(self):
         pass
-
-

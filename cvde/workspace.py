@@ -24,9 +24,6 @@ class ModuleExistsError(Exception):
 
 
 class Workspace:
-    stop_queue = None
-    lock = None
-
     _instance = None
     FOLDERS = [
         "models",

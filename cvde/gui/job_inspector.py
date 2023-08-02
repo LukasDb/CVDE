@@ -1,30 +1,39 @@
 import streamlit as st
 import streamlit_scrollable_textbox as stx
+from streamlit_tags import st_tags, st_tags_sidebar
 import os
 import yaml
 import numpy as np
 import plotly.graph_objects as go
-from typing import List
+from typing import List, Dict, Type, Set
 import time
+from PIL import Image
 
 from cvde.job.job_tracker import JobTracker, LogEntry
 
 
 class JobInspector:
-    TAGS = ["final", "notable", "testing"]
-
     def __init__(self) -> None:
-        self.expanders = {}
-        self.img_epochs = {}
+        self.expanders: Dict[str, Type] = {}
         self.expand_all = False
 
         self.runs = os.listdir("log")
         self.all_trackers = [JobTracker.from_log(run) for run in self.runs]
         self.all_trackers.sort(key=lambda t: t.started, reverse=True)
+
+        if "tags" not in st.session_state:
+            st.session_state.tags = set()
+
+        self.tags: Set[str] = st.session_state.tags
+        self.tags.clear()
+        for t in self.all_trackers:
+            for tag in t.tags:
+                self.tags.add(tag)
+
         st.subheader("Runs", anchor=False)
 
     def run(self):
-        trackers = self.get_selected_trackers() # also builds the sidebar
+        trackers = self.get_selected_trackers()  # also builds the sidebar
         trackers.sort(key=lambda t: t.started, reverse=True)
 
         # extract variable names
@@ -39,9 +48,21 @@ class JobInspector:
                 num_epochs = [0]
             self.max_epoch = max(num_epochs)
 
+            cols = st.columns(len(trackers))
+            for tracker, col in zip(trackers, cols):
+                with col:
+                    tags = st_tags(
+                        value=tracker.tags,
+                        label="Tags",
+                        suggestions=list(self.tags),
+                        key="tags_" + tracker.unique_name,
+                    )
+                    for tag in tags:
+                        self.tags.add(tag)
+                    tracker.set_tags(tags)
+
         # display data
         # for each variable name, assemble plot of data
-
         for var_name in var_names:
             fig = None
             for t in trackers:
@@ -54,6 +75,9 @@ class JobInspector:
                 x = np.array([getattr(i, key) for i in run_data])
                 y = [i.data for i in run_data]
 
+                if len(y) == 0:
+                    continue
+
                 # convert tensors to numpy
                 if hasattr(y[0], "cpu"):
                     y = [i.cpu() for i in y]
@@ -62,23 +86,35 @@ class JobInspector:
                 if hasattr(y[0], "numpy"):
                     y = [i.numpy() for i in y]
 
-                y = np.array(y)
+                if run_data[0].is_image:
+                    exp = self.get_expander(var_name)
+                    # select index
+                    if self.max_epoch > 1:
+                        epoch = exp.slider(
+                            "select",
+                            min_value=0,
+                            label_visibility="hidden",
+                            max_value=self.max_epoch - 1,
+                            key="epch_slider" + var_name + t.unique_name,
+                            value=self.max_epoch - 1,
+                        )
+                    else:
+                        epoch = 0
+                    img_path = y[epoch]
+                    # read img
+                    img = Image.open(img_path)
 
-                if len(y.shape) == 3:
-                    # add channel to channel less images
-                    y = np.expand_dims(y, -1)
+                    exp.image(img, caption=f"{t.display_name}")
 
-                if len(y.shape) == 4:
-                    self.visualize_image_with_controls(var_name, y, t.unique_name)
-
-                elif len(y.shape) == 1:
+                else:
                     if fig is None:
                         fig = go.Figure()
 
-                    fig.add_scatter(x=x, y=y, name=t.unique_name, showlegend=True)
+                    fig.add_scatter(x=x, y=y, name=t.display_name, showlegend=True)
                     exp = self.get_expander(var_name, default=st.empty)
                     if self.log_axes:
                         fig.update_yaxes(type="log")
+                    fig.update_layout(legend=dict(orientation="h"))
                     exp.plotly_chart(fig)
 
         conf_exp = st.expander("Config")
@@ -88,14 +124,6 @@ class JobInspector:
         for col, tracker in zip(cols, trackers):
             col.text(f"{tracker.name} ({tracker.started})")
             col.code(yaml.dump(tracker.config), language="yaml")
-
-        tags_exp = st.expander("Set tags")
-        cols = tags_exp.columns(len(trackers))
-        for tracker, col in zip(trackers, cols):
-            set_tags = col.multiselect(
-                f"Tags: {tracker.name}", self.TAGS, default=tracker.tags, key="tags_"+tracker.unique_name
-            )
-            tracker.set_tags(set_tags)
 
         stdout_exp = st.expander("Stdout")
         cols = stdout_exp.columns(len(trackers))
@@ -121,14 +149,14 @@ class JobInspector:
                     key=tracker.unique_name + "_stderr",
                 )
 
-    def get_selected_trackers(self):
+    def get_selected_trackers(self) -> List[JobTracker]:
         # assemble settings in sidebar
         with st.sidebar:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
             self.log_axes = st.checkbox("Logarithmic", value=True)
             self.expand_all = st.checkbox("Expand all")
-            selected_tags = st.multiselect("Filter by tags", options=self.TAGS)
+            selected_tags = st.multiselect("Filter by tags", options=self.tags)
             cols = st.columns(2)
             cols[0].subheader("Logged runs", anchor=False)
             all_selected = cols[1].checkbox("Select all")
@@ -136,18 +164,14 @@ class JobInspector:
         # filter by tags
         if len(selected_tags) > 0:
             self.all_trackers = [
-                t
-                for t in self.all_trackers
-                if any(tag in selected_tags for tag in t.tags)
+                t for t in self.all_trackers if any(tag in selected_tags for tag in t.tags)
             ]
 
         # gui + select runs
         trackers: List[JobTracker] = []
         for tracker in self.all_trackers:
             with st.sidebar:
-                if st.checkbox(
-                    tracker.display_name, value=all_selected, key=tracker.unique_name
-                ):
+                if st.checkbox(tracker.display_name, value=all_selected, key=tracker.unique_name):
                     trackers.append(tracker)
 
         with st.sidebar:
@@ -169,7 +193,7 @@ class JobInspector:
 
     def get_expander(self, var_name, default=None):
         if var_name not in self.expanders:
-            self.expanders[var_name] = exp = st.expander(var_name,expanded=self.expand_all)
+            self.expanders[var_name] = exp = st.expander(var_name, expanded=self.expand_all)
 
             if default is not None:
                 with exp:
@@ -178,34 +202,3 @@ class JobInspector:
                 self.expanders[var_name] = container
 
         return self.expanders[var_name]
-
-    def visualize_image_with_controls(self, var_name, imgs, caption):
-        exp = self.get_expander(var_name)
-
-        if var_name not in self.img_epochs:
-            epoch = 0
-            if self.max_epoch > 1:
-                epoch = exp.slider(
-                    "select",
-                    min_value=0,
-                    label_visibility="hidden",
-                    max_value=self.max_epoch - 1,
-                    key=var_name,
-                    value=self.max_epoch - 1,
-                )
-
-            self.img_epochs[var_name] = epoch
-
-        try:
-            epoch = self.img_epochs[var_name]
-            img = imgs[epoch]
-        except Exception:
-            exp.error(f"Not enough datapoints {caption}")
-            return
-
-        channel_dim = np.argmin(img.shape)
-        other_dims = [i for i in range(3) if i != channel_dim]
-        transp = [*other_dims, channel_dim]
-        img = np.transpose(img, transp)
-
-        exp.image(img, caption=caption)

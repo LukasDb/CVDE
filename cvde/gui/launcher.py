@@ -27,13 +27,22 @@ class Launcher:
         self.configs.sort()
 
     def run(self):
-        buttons = st.columns([1, 1, 1, 1, 1])
-        job_names = [x.__name__ for x in WS().jobs]
-        job_name = buttons[0].selectbox("Job", job_names, label_visibility="collapsed")
-        config_name = buttons[1].selectbox("Config", WS().configs, label_visibility="collapsed")
+        buttons1 = st.columns([1, 1, 1, 1, 1])
+        buttons2 = st.columns([1, 1, 1, 1, 1])
 
-        if buttons[2].button("Launch", use_container_width=True):
-            self.launch_job(job_name, config_name)
+        job_names = [x.__name__ for x in WS().jobs]
+        job_name = buttons2[0].selectbox("Job", job_names)
+        config_name = buttons2[1].selectbox("Config", WS().configs)
+        run_name = buttons2[2].text_input(
+            "Run",
+            placeholder=job_name + "_" + config_name,
+            help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
+        )
+        if len(run_name) == 0:
+            run_name = job_name + "_" + config_name
+
+        if buttons1[0].button("Launch", use_container_width=True):
+            self.launch_job(job_name, config_name, run_name)
 
         if config_name is None:
             return
@@ -46,9 +55,9 @@ class Launcher:
             with config_path.open("w") as F:
                 F.write(new_config)
 
-    def launch_job(self, job_name, config_name):
+    def launch_job(self, job_name, config_name, run_name):
         WS().reload_modules()
         job_fn = cvde.job.Job.load_job(job_name)
-        job = job_fn(config_name=config_name)
+        job = job_fn(config_name=config_name, run_name=run_name)
         job.launch()
-        st.info(f"Job {job_name} launched.")
+        st.info(f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'.")

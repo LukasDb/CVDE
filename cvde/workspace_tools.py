@@ -28,13 +28,14 @@ def list_modules(base_module: str, condition: Union[Callable[[Any], bool], None]
         except ImportError:
             pass
 
-        modules.extend(
-            [
-                v
-                for k, v in module.__dict__.items()
-                if condition is None or (not k.startswith("_") and condition(v))
-            ]
-        )
+        for k, v in module.__dict__.items():
+            try:
+                if condition is None or (not k.startswith("_") and condition(v)):
+                    modules.append(v)
+            except Exception as e:
+                print("Module", k, "failed with", e)
+                print(v)
+                raise e
     return modules
 
 
