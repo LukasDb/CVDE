@@ -63,30 +63,8 @@ def dashboard():
         st.code(WS().summary(), language="html")
 
     with st.expander("Device Status", expanded=True):
-        # smi = subprocess.run(["nvidia-smi"], capture_output=True).stdout.decode()
-        # st.subheader("Device Status", anchor=False)
-        # st.code(smi, language="html")
-
-        # faster
-        os.system("nvidia-smi stats -d pwrDraw,temp,gpuUtil,memUtil -c 1 > /tmp/gpu_util.txt")
+        os.system("nvidia-smi > /tmp/gpu_util.txt")
 
         with open("/tmp/gpu_util.txt", "r") as f:
             gpu_util = f.read()
-        # list with id, type, time_stamp, value
-        gpu_stats = {}
-        for line in gpu_util.split("\n"):
-            if len(line) > 0:
-                id, type, _, value = line.split(",")
-                gpu_stats[id] = gpu_stats.get(id, {})
-                gpu_stats[id][type] = gpu_stats[id].get(type, [])
-                gpu_stats[id][type].append(float(value))
-
-        gpu_cols = st.columns(len(gpu_stats))
-        for id, data in gpu_stats.items():
-            gpu_cols[int(id)].subheader(f"GPU {id}")
-            for type, values in data.items():
-                gpu_cols[int(id)].code(f"{type}: {np.mean(values):.3f}", language="html")
-        # st.code(gpu_util, language="html")
-
-
-# run this continously in a thread? to get tha latest info?
+        st.code(gpu_util, language="html")

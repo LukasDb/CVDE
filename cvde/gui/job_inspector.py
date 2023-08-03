@@ -36,14 +36,16 @@ class JobInspector:
             selected_tags = st.multiselect("Filter by tags", options=self.tags)
             cols = st.columns(2)
             cols[0].subheader("Logged runs", anchor=False)
-            all_selected = cols[1].checkbox("Select all")
+            all_selected = cols[1].checkbox("Select all", on_change=self.select_all, key="select_all")
 
         self.active_trackers: List[JobTracker] = []
         for t in all_trackers:
             has_a_selected_tag = any(tag in selected_tags for tag in t.tags)
             if len(selected_tags) > 0 and not has_a_selected_tag:
                 continue
-            if st.sidebar.checkbox(t.display_name, value=all_selected, key=t.unique_name):
+            if st.sidebar.checkbox(
+                t.display_name, value=all_selected, key="select_" + t.unique_name
+            ):
                 self.active_trackers.append(t)
 
         with st.sidebar:
@@ -188,3 +190,8 @@ class JobInspector:
                 self.expanders[var_name] = container
 
         return self.expanders[var_name]
+
+    def select_all(self):
+        for key in st.session_state.keys():
+            if isinstance(key, str) and key.startswith("select_"):
+                st.session_state[key] = st.session_state["select_all"]
