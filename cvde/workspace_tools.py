@@ -40,7 +40,7 @@ def list_modules(base_module: str, condition: Union[Callable[[Any], bool], None]
 
 
 def load_module(base_module, module_name):
-    modules = list_modules(base_module, lambda x: x.__name__ == module_name)
+    modules = list_modules(base_module, lambda x: getattr(x, "__name__", "") == module_name)
     if len(modules) == 0:
         raise ImportError(f"Could not find module {module_name} in {base_module}")
     if len(modules) > 1:
