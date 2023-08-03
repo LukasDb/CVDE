@@ -122,7 +122,7 @@ class Workspace:
         self.created = state["created"]
 
     @property
-    def datasets(self):
+    def datasets(self) -> List[type[cvde.tf.Dataset]]:
         return ws_tools.list_modules(
             "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
         )

@@ -1,29 +1,19 @@
-import traceback
-from itertools import cycle
-import numpy as np
-import logging
 import streamlit as st
-import os
-import json
-import cv2
-import pandas as pd
 
 import cvde
 from cvde.workspace import Workspace as WS
 import cvde.workspace_tools as ws_tools
-from typing import Tuple, Iterable
 
 
-@st.cache_resource
-def get_cached_dataset(dataset: cvde.tf.Dataset, **kwargs) -> cvde.tf.Dataset:
-    dataset_fn = cvde.tf.Dataset.load_dataset(dataset)
+@st.cache_resource(show_spinner="Creating dataset...", max_entries=5)
+def get_cached_dataset(dataset_fn: type[cvde.tf.Dataset], **kwargs) -> cvde.tf.Dataset:
     dataset = dataset_fn(**kwargs)
     return dataset
 
 
-@st.cache_data
+@st.cache_data(show_spinner="Loading data...")
 def get_data(_dataset, data_index):
-    return next(_dataset)
+    return _dataset[data_index]
 
 
 def inc_data_index():
@@ -35,7 +25,6 @@ def dec_data_index():
 
 
 def reset():
-    st.cache_resource.clear()
     st.cache_data.clear()
     st.session_state.data_index = 0
 
@@ -43,8 +32,6 @@ def reset():
 def data_explorer():
     if "data_index" not in st.session_state:
         st.session_state["data_index"] = 0
-    if "max_data" not in st.session_state:
-        st.session_state["max_data"] = 1
 
     data_loaders = [x.__name__ for x in WS().datasets]
     configs = WS().configs
@@ -65,10 +52,10 @@ def data_explorer():
 
     if dataset_name is None:
         return
-
-    with st.spinner("Loading data..."):
-        dataset = get_cached_dataset(dataset_name, **config)
-        data = get_data(dataset, int(st.session_state.data_index))
+    
+    dataset_fn = cvde.tf.Dataset.load_dataset(dataset_name)
+    dataset = get_cached_dataset(dataset_fn, **config)
+    data = get_data(dataset, int(st.session_state.data_index))
 
     st.subheader(f"#{st.session_state.data_index}", anchor=False)
     dataset.visualize_example(data)

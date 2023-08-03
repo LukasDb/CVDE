@@ -50,6 +50,7 @@ class Job(ABC):
         job_thread.start()
 
     def _run(self):
+        """runs in thread"""
         self.tracker.set_thread_ident()
         sys.stdout.register_new_out(self.tracker.stdout_file)
         sys.stderr.register_new_out(self.tracker.stderr_file)
