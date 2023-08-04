@@ -132,9 +132,9 @@ class JobInspector:
                         epoch = 0
                     img_path = y[epoch]
                     # read img
-                    img = Image.open(img_path)
+                    #img = Image.open(img_path)
 
-                    exp.image(img, caption=f"{t.display_name}")
+                    exp.image(img_path, caption=f"{t.display_name}")
 
                 else:
                     if fig is None:

@@ -74,9 +74,8 @@ def main():
 
     elif sel_p == "Data":
         title("Data Explorer")
-        from cvde.gui.data_explorer import data_explorer
-
-        data_explorer()
+        from cvde.gui.data_explorer import DataExplorer
+        DataExplorer()
 
     elif sel_p == "Models":
         title("Model Explorer")

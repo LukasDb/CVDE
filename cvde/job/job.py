@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from .job_tracker import JobTracker
 import cvde.workspace_tools as ws_tools
 from cvde.workspace import Workspace as WS
+from cvde.gui import notify
 import threading
 from typing import Union
 import sys
@@ -55,7 +56,7 @@ class Job(ABC):
         sys.stdout.register_new_out(self.tracker.stdout_file)
         sys.stderr.register_new_out(self.tracker.stderr_file)
         self.run()
-        print("Job finished: ", self.name)
+        notify("Job finished: ", self.name)
 
     @abstractmethod
     def run(self):

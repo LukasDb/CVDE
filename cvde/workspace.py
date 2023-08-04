@@ -1,18 +1,15 @@
 import json
-import yaml
-import numpy as np
 import os
 import shutil
 import logging
 import importlib
 from datetime import datetime
-from enum import Enum, auto
-from typing import Any, List, Callable
+from typing import  List
 import pathlib
 import inspect
 import tensorflow as tf
 import sys
-import threading
+import streamlit as st
 
 
 import cvde
@@ -21,6 +18,11 @@ import cvde.workspace_tools as ws_tools
 
 class ModuleExistsError(Exception):
     pass
+
+
+@st.cache_resource
+def persisistent_stop_queue():
+    return set()
 
 
 class Workspace:
@@ -36,8 +38,6 @@ class Workspace:
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(Workspace, cls).__new__(cls, *args, **kwargs)
-            cls.stop_queue = set()
-            cls.lock = threading.Lock()
         return cls._instance
 
     def __init__(self) -> None:
@@ -45,6 +45,10 @@ class Workspace:
             self._read_state()
         except FileNotFoundError:
             pass
+
+    @property
+    def stop_queue(self):
+        return persisistent_stop_queue()
 
     def init_workspace(self, name: str) -> None:
         logging.info("Creating empty workspace...")

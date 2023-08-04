@@ -8,6 +8,7 @@ from typing import List
 import pathlib
 
 import cvde
+import cvde.gui
 from cvde.workspace import Workspace as WS
 from cvde.workspace import ModuleExistsError
 import cvde.workspace_tools as ws_tools
@@ -69,4 +70,4 @@ class Launcher:
         job_fn = cvde.job.Job.load_job(job_name)
         job = job_fn(config_name=config_name, run_name=run_name, tags=tags)
         job.launch()
-        st.info(f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'.")
+        cvde.gui.notify(f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'.")
