@@ -13,7 +13,6 @@ setup(
     install_requires=open("requirements.txt").readlines(),
     entry_points= {"console_scripts": ["cvde = cvde.__main__:run"]},
     classifiers=[
-        "Development Status :: 1 - Planning",
         "Intended Audience :: Science/Research",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3.10",

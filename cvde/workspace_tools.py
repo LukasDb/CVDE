@@ -58,5 +58,5 @@ def load_loss(__loss_name):
 
 def load_config(config_name) -> Dict:
     with pathlib.Path("configs/" + config_name + ".yml").open() as F:
-        job: Dict = yaml.safe_load(F)
+        job: Dict = yaml.load(F, Loader=yaml.Loader)
     return job
