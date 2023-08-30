@@ -65,6 +65,8 @@ class Dataset(ABC):
         # shard every 500MB (compression leads to ~2x smaller files)
         shard_every_n_datapoints = int(1000e6 / size_one_datapoint)
 
+        shard_every_n_datapoints = min(len(self), shard_every_n_datapoints) # make sure we don't shard more than the dataset size
+
         # split range into chunks of shard_every_n_datapoints
         starts = np.array_split(np.arange(len(self)), len(self) // shard_every_n_datapoints)
         starts = [start[0] for start in starts]
@@ -79,6 +81,7 @@ class Dataset(ABC):
             pass
 
         n_workers = min(psutil.cpu_count(logical=False), 16)
+        n_workers = min(n_workers, len(jobs))
         job_queue: mp.Queue = mp.Queue(maxsize=n_workers)
 
         workers = [mp.Process(target=self.process, args=(job_queue,)) for _ in range(n_workers)]
