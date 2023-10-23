@@ -1,71 +1,60 @@
-import traceback
-from itertools import cycle
-import numpy as np
-import logging
 import streamlit as st
-import os
-import json
-import cv2
-import pandas as pd
 
 import cvde
 from cvde.workspace import Workspace as WS
-from cvde.workspace_tools import load_dataset, load_job
-from typing import Tuple, Iterable
+import cvde.workspace_tools as ws_tools
 
 
-@st.cache_resource
-def get_cached_dataset(dataset: cvde.tf.Dataset, **kwargs) -> cvde.tf.Dataset:
-    dataset = load_dataset(dataset, **kwargs)
-    return dataset
+class DataExplorer:
+    def __init__(self):
+        if "data_index" not in st.session_state:
+            st.session_state["data_index"] = 0
 
+        data_loaders = [x.__name__ for x in WS().datasets]
+        configs = WS().configs
 
-@st.cache_data
-def get_data(_dataset, data_index):
-    return next(_dataset)
+        # build data viewer
+        col1, col2, col3 = st.columns(3)
+        dataset_name = col1.selectbox("Data source", data_loaders, on_change=self.reset)
+        config_name = col2.selectbox("Config", configs, on_change=self.reset)
 
+        # reloads page, progresses through iterable dataset
+        buttons = col3.columns(3)
+        buttons[0].button("Prev", on_click=self.dec_data_index)
+        buttons[1].button("Next", on_click=self.inc_data_index)
+        buttons[2].button("Reset", on_click=self.reset)
 
-def inc_data_index():
-    st.session_state.data_index += 1
+        config = ws_tools.load_config(config_name)
+        config = config.get(dataset_name, {})
 
+        if dataset_name is None:
+            return
 
-def dec_data_index():
-    st.session_state.data_index -= 1
+        if "loaded_dataset" not in st.session_state:
+            with st.spinner("Loading dataset..."):
+                dataset_fn = cvde.tf.Dataset.load_dataset(dataset_name)
+                dataset = dataset_fn(**config)
+            st.session_state["loaded_dataset"] = dataset
+        else:
+            dataset = st.session_state["loaded_dataset"]
 
+        data = self.get_data(dataset, int(st.session_state.data_index))
 
-def reset():
-    st.cache_resource.clear()
-    st.cache_data.clear()
-    st.session_state.data_index = 0
+        st.subheader(f"#{st.session_state.data_index}", anchor=False)
+        dataset.visualize_example(data)
 
+    @st.cache_data(show_spinner="Loading data...")
+    def get_data(_self, _dataset, data_index):
+        return _dataset[data_index]
 
-def data_explorer():
-    st.title("Data Explorer")
+    def inc_data_index(self):
+        st.session_state.data_index += 1
 
-    if "data_index" not in st.session_state:
-        st.session_state["data_index"] = 0
-    if "max_data" not in st.session_state:
-        st.session_state["max_data"] = 1
+    def dec_data_index(self):
+        st.session_state.data_index -= 1
 
-    data_loaders = WS().datasets
-    jobs = WS().jobs
-
-    # build data viewer
-    col1, col2, col3 = st.columns(3)
-    dataset_name = col1.selectbox("Data source", data_loaders, on_change=reset)
-    job_name = col2.selectbox("Job", jobs, on_change=reset)
-
-    # reloads page, progresses through iterable dataset
-    buttons = col3.columns(3)
-    buttons[0].button("Prev", on_click=dec_data_index)
-    buttons[1].button("Next", on_click=inc_data_index)
-    buttons[2].button("Reset", on_click=reset)
-
-    job = load_job(job_name)
-
-    with st.spinner("Loading data..."):
-        dataset = get_cached_dataset(dataset_name, **job)
-        data = get_data(dataset, int(st.session_state.data_index))
-
-    st.subheader(f"#{st.session_state.data_index}", anchor=False)
-    dataset.visualize_example(data)
+    def reset(self):
+        if "loaded_dataset" in st.session_state:
+            del st.session_state["loaded_dataset"]
+        st.cache_data.clear()
+        st.session_state.data_index = 0

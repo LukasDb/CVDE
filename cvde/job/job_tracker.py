@@ -1,6 +1,5 @@
-import pickle
 import json
-import streamlit as st
+import pickle
 from datetime import datetime
 import os
 from pathlib import Path
@@ -10,6 +9,7 @@ from typing import Any, List
 import shutil
 import yaml
 import threading
+from PIL import Image
 
 
 @dataclass
@@ -17,6 +17,7 @@ class LogEntry:
     t: datetime
     index: int
     data: Any
+    is_image: bool
 
 
 class JobTracker:
@@ -26,6 +27,7 @@ class JobTracker:
 
         self.folder_name = folder_name
         self.name = meta["name"]
+        self.job_name = meta["job"]
         self.started = meta["started"]
         self.tags = meta["tags"]
         self.root = Path("log/" + self.folder_name)
@@ -41,7 +43,7 @@ class JobTracker:
         return tracker
 
     @staticmethod
-    def create(job_name: str):
+    def create(job_name: str, config_name: str, run_name: str):
         """creates folder structure for run"""
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
@@ -60,12 +62,13 @@ class JobTracker:
         stderr_file.touch()
 
         # COPY JOB CONFIG OVER
-        job_config_path = Path("jobs") / (job_name + ".yml")
+        job_config_path = Path("configs") / (config_name + ".yml")
         shutil.copy(job_config_path, root / "job.yml")
 
         started = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         meta = {
-            "name": job_name,
+            "job": job_name,
+            "name": run_name,
             "started": started,
             "tags": [],
             "ident": None,
@@ -88,8 +91,6 @@ class JobTracker:
 
     @property
     def in_progress(self):
-        # children = mp.active_children()
-        # return "thread_"+self.unique_name in [c.name for c in children]
         return "thread_" + self.unique_name in [t.name for t in threading.enumerate()]
 
     @property
@@ -107,7 +108,7 @@ class JobTracker:
     def delete_log(self):
         shutil.rmtree(self.root)
 
-    def set_tags(self, tags):
+    def set_tags(self, tags: List[str]):
         self.tags = tags
 
         with (self.root / "log.json").open() as F:
@@ -132,24 +133,28 @@ class JobTracker:
         return sorted(var_names)
 
     def read_var(self, var: str) -> List[LogEntry]:
-        var_name = var + ".pkl"
-        with (self.var_root.joinpath(var_name)).open("rb") as F:
-            data: List[LogEntry] = pickle.load(F)
+        # this reads everything...
+        files = sorted(list((self.var_root / var).glob("*.pkl")))
+        data = [pickle.load(F.open("rb")) for F in files]
+        data = [LogEntry(**d) for d in data]
         return data
 
     def log(self, name, var, index=None):
         """log variable"""
-        var_path = self.var_root.joinpath(name + ".pkl")
-        try:
-            with var_path.open("rb") as F:
-                data = pickle.load(F)
-        except FileNotFoundError:
-            data = []
+        var_folder = self.var_root / name
+        var_folder.mkdir(exist_ok=True)
 
-        index = len(data) if index is None else index
+        index = len(var_folder.iterdir()) if index is None else index
 
-        new_data = LogEntry(t=datetime.now(), index=index, data=var)
-        data.append(new_data)
+        var_path = self.var_root / name / f"{index:06}.pkl"
 
+        if len(var.shape) >= 2:
+            # save as jpg
+            img_path = self.var_root / name / f"{index:06}.png"
+            im = Image.fromarray(var)
+            im.save(img_path)
+            data = {"t": datetime.now(), "index": index, "data": str(img_path), "is_image": True}
+        else:
+            data = {"t": datetime.now(), "index": index, "data": var, "is_image": False}
         with var_path.open("wb") as F:
             pickle.dump(data, F)

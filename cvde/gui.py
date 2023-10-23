@@ -1,6 +1,9 @@
+import sys
 import os
 
+import silence_tensorflow.auto
 import tensorflow as tf
+import itertools as it
 
 gpus = tf.config.experimental.list_physical_devices("GPU")
 if gpus:
@@ -15,18 +18,13 @@ import streamlit as st
 from datetime import datetime
 from cvde.workspace import Workspace as WS
 import requests
+import threading
+from pathlib import Path
+import colorama
 
 
 def main():
-    st.set_page_config(
-        layout="wide",
-        page_title=WS().name,
-        menu_items={
-            "Get Help": "https://github.com/LukasDb/CVDE",
-            "Report a bug": "https://github.com/LukasDb/CVDE/issues",
-            "About": "Tool to manage CV experiments and training deep learning models.",
-        },
-    )
+    sys.path.append(os.getcwd())
 
     style_file = os.path.join(os.path.dirname(__file__), "style.css")
     with open(style_file) as F:
@@ -37,7 +35,6 @@ def main():
         "Dashboard",
         "Data",
         "Models",
-        # "Configurator",
         "Jobs",
         "Inspector",
         "Deployment",
@@ -66,9 +63,7 @@ def main():
         st.title(t, anchor=False)
         c1, c2 = st.columns([1, 20])
         c1.button("⟳", key=t + "_reload")
-        c2.markdown(
-            f'{current_weather} *Last update: {datetime.now().strftime("%H:%M:%S")}*'
-        )
+        c2.markdown(f'{current_weather} *Last update: {datetime.now().strftime("%H:%M:%S")}*')
 
     sel_p = st.session_state["selected_page"]
     if sel_p == "Dashboard":
@@ -78,9 +73,9 @@ def main():
         dashboard()
 
     elif sel_p == "Data":
-        from cvde.gui.data_explorer import data_explorer
-
-        data_explorer()
+        title("Data Explorer")
+        from cvde.gui.data_explorer import DataExplorer
+        DataExplorer()
 
     elif sel_p == "Models":
         title("Model Explorer")
@@ -88,13 +83,6 @@ def main():
 
         me = ModelExplorer()
         me.run()
-
-    elif sel_p == "Configurator":
-        title("Configurator")
-        from cvde.gui.job_editor import JobEditor
-
-        ce = JobEditor()
-        ce.run()
 
     elif sel_p == "Jobs":
         title("Jobs")
@@ -119,4 +107,79 @@ def main():
 
 
 if __name__ == "__main__":
+    st.set_page_config(
+        layout="wide",
+        page_title=WS().name,
+        menu_items={
+            "Get Help": "https://github.com/LukasDb/CVDE",
+            "Report a bug": "https://github.com/LukasDb/CVDE/issues",
+            "About": "Tool to manage CV experiments and training deep learning models.",
+        },
+    )
+
+    class ThreadPrinter:
+        def __init__(self, stream):
+            self.file_outs = {}
+            self.colors = {}
+            self.stream = stream
+            self.encoding = stream.encoding
+            self._lock = threading.Lock()
+            self._colors = [
+                colorama.Fore.RED,
+                colorama.Fore.GREEN,
+                colorama.Fore.YELLOW,
+                colorama.Fore.BLUE,
+                colorama.Fore.MAGENTA,
+                colorama.Fore.CYAN,
+            ]
+            self.last_color_i = 0
+
+        def register_new_out(self, filepath: Path):
+            with self._lock:
+                cur = threading.currentThread().ident
+                self.file_outs[cur] = filepath.open("w")
+                self.colors[cur] = self._colors[self.last_color_i % len(self._colors)]
+                self.last_color_i += 1
+
+        def write(self, value):
+            with self._lock:
+                try:
+                    color = self.colors[threading.currentThread().ident]
+                except KeyError:
+                    color = colorama.Fore.WHITE
+                    
+
+                self.stream.write(color)
+                self.stream.flush()
+                self.stream.write(value)
+                self.stream.flush()
+                try:
+                    file = self.file_outs[threading.currentThread().ident]
+                    file.write(value)
+                    file.flush()
+                except KeyError:
+                    pass
+
+        def __eq__(self, other):
+            return other is self.stream
+
+        def flush(self):
+            with self._lock:
+                try:
+                    file = self.file_outs[threading.currentThread().ident]
+                    file.flush()
+                except KeyError:
+                    return
+                self.stream.flush()
+
+    @st.cache_resource
+    def get_stdout_threadprinter():
+        return ThreadPrinter(sys.stdout)
+
+    @st.cache_resource
+    def get_stderr_threadprinter():
+        return ThreadPrinter(sys.stderr)
+
+    sys.stdout = get_stdout_threadprinter()
+    sys.stderr = get_stderr_threadprinter()
     main()

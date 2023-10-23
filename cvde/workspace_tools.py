@@ -1,63 +1,62 @@
-from typing import Dict
+from typing import Dict, Callable
 import tensorflow as tf
-import os
 import yaml
 import importlib
 import pathlib
+import sys
+from typing import Any, Union
 import cvde
 
 
-def load_module(base_module, module_name):
+def list_modules(base_module: str, condition: Union[Callable[[Any], bool], None] = None):
+    loaded = sys.modules.copy()
+    for mod in loaded:
+        if mod.startswith(base_module):
+            del sys.modules[mod]
+
     files = list(
         x
         for x in pathlib.Path(base_module).iterdir()
         if x.is_file() and not x.stem.startswith("_")
     )
+    modules = []
 
     for file in files:
-        import_path = base_module + "." + file.stem
-        module = importlib.import_module(import_path)
-        if hasattr(module, module_name):
-            break
-    importlib.reload(module)
-    return module
+        module = importlib.import_module(base_module + "." + file.stem)
+        try:
+            importlib.reload(module)
+        except ImportError:
+            pass
+
+        for k, v in module.__dict__.items():
+            try:
+                if condition is None or (not k.startswith("_") and condition(v)):
+                    modules.append(v)
+            except Exception as e:
+                print("Module", k, "failed with", e)
+                print(v)
+                raise e
+    return modules
 
 
-def load_metric(__metric_name, **kwargs) -> tf.keras.metrics.Metric:
-    metric_module = load_module("metrics", __metric_name)
-    metric = getattr(metric_module, __metric_name)
-    metric = metric(**kwargs.get(__metric_name, {}))
-    return metric
+def load_module(base_module, module_name):
+    modules = list_modules(base_module, lambda x: getattr(x, "__name__", "") == module_name)
+    if len(modules) == 0:
+        raise ImportError(f"Could not find module {module_name} in {base_module}")
+    if len(modules) > 1:
+        raise ImportError(f"Found multiple modules with name {module_name} in {base_module}")
+    return modules[0]
 
 
-def load_callback(__callback_name):
-    callback_module = load_module("callbacks", __callback_name)
-    callback = getattr(callback_module, __callback_name)
-    return callback
-
-
-def load_dataset(__dataset_name, **kwargs) -> cvde.tf.Dataset:
-    if __dataset_name is None:
-        return None
-    dataset_module = load_module("datasets", __dataset_name)
-    ds = getattr(dataset_module, __dataset_name)
-    return ds(**kwargs.get(__dataset_name, {}))
-
-
-def load_model(__model_name, **kwargs) -> tf.keras.Model:
-    model_module = load_module("models", __model_name)
-    model = getattr(model_module, __model_name)
-    model = model(**kwargs.get(__model_name, {}))
-    return model
+def load_model(__model_name) -> type[tf.keras.Model]:
+    return load_module("models", __model_name)
 
 
 def load_loss(__loss_name):
-    loss_module = load_module("losses", __loss_name)
-    loss = getattr(loss_module, __loss_name)
-    return loss
+    return load_module("losses", __loss_name)
 
 
-def load_job(job_name) -> Dict:
-    with open(os.path.join("jobs", job_name + ".yml")) as F:
-        job: Dict = yaml.safe_load(F)
+def load_config(config_name) -> Dict:
+    with pathlib.Path("configs/" + config_name + ".yml").open() as F:
+        job: Dict = yaml.load(F, Loader=yaml.Loader)
     return job

@@ -1,27 +1,39 @@
 import json
-import yaml
 import os
+import shutil
 import logging
 import importlib
 from datetime import datetime
-from enum import Enum, auto
-import sys
-from typing import Any, List, Callable
+from typing import  List
 import pathlib
 import inspect
 import tensorflow as tf
+import sys
+import streamlit as st
+
 
 import cvde
-
-sys.path.append(os.getcwd())
+import cvde.workspace_tools as ws_tools
 
 
 class ModuleExistsError(Exception):
     pass
 
 
+@st.cache_resource
+def persisistent_stop_queue():
+    return set()
+
+
 class Workspace:
     _instance = None
+    FOLDERS = [
+        "models",
+        "datasets",
+        "jobs",
+        "losses",
+        "configs",
+    ]
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -33,6 +45,10 @@ class Workspace:
             self._read_state()
         except FileNotFoundError:
             pass
+
+    @property
+    def stop_queue(self):
+        return persisistent_stop_queue()
 
     def init_workspace(self, name: str) -> None:
         logging.info("Creating empty workspace...")
@@ -47,19 +63,61 @@ class Workspace:
         with open(".workspace.cvde", "w") as F:
             json.dump(state, F, indent=4)
 
-        folders = [
-            "models",
-            "datasets",
-            "jobs",
-            "optimizers",
-            "losses",
-            "callbacks",
-            "metrics",
-        ]
-        for folder in folders:
+        for folder in self.FOLDERS:
             os.makedirs(folder)
             with open(os.path.join(folder, "__init__.py"), "w") as F:
                 F.write("")
+
+        # change/add .vscode launch config for debugging
+        try:
+            with pathlib.Path(".vscode/launch.json").open() as F:
+                launch_config = json.load(F)
+        except FileNotFoundError:
+            launch_config = {
+                "version": "0.2.0",
+                "configurations": [],
+            }
+
+        # check if launch config already exists
+        add_pytest = True
+        add_gui_debug = True
+        for config in launch_config["configurations"]:
+            if config["name"] == "Python: PyTest":
+                add_pytest = False
+            if config["name"] == "Python: CVDE GUI":
+                add_gui_debug = False
+
+        pytest_path = shutil.which("pytest")
+        streamlit_path = shutil.which("streamlit")
+        cvde_gui_path = pathlib.Path(__file__).parent / "gui.py"
+
+        if add_pytest and pytest_path is not None:
+            launch_config["configurations"].append(
+                {
+                    "name": "Python: PyTest",
+                    "type": "python",
+                    "request": "launch",
+                    "program": pytest_path,
+                    "console": "integratedTerminal",
+                    "justMyCode": True,
+                }
+            )
+
+        if add_gui_debug:
+            launch_config["configurations"].append(
+                {
+                    "name": "Python: CVDE GUI",
+                    "type": "python",
+                    "request": "launch",
+                    "program": streamlit_path,
+                    "args": ["run", str(cvde_gui_path.resolve())],
+                    "justMyCode": True,
+                }
+            )
+
+        pathlib.Path(".vscode/").mkdir(exist_ok=True)
+        with pathlib.Path(".vscode/launch.json").open("w") as F:
+            json.dump(launch_config, F, indent=4)
 
     def _read_state(self):
         with open(".workspace.cvde") as F:
@@ -67,79 +125,36 @@ class Workspace:
         self.name = state["name"]
         self.created = state["created"]
 
-    def _list_modules(self, base_module: str, condition: Callable[[Any], bool]):
-        loaded = sys.modules.copy()
-        for mod in loaded:
-            if mod.startswith(base_module):
-                del sys.modules[mod]
-
-        files = list(
-            x
-            for x in pathlib.Path(base_module).iterdir()
-            if x.is_file() and not x.stem.startswith("_")
-        )
-        datasets = []
-
-        for file in files:
-            module = importlib.import_module(base_module + "." + file.stem)
-            try:
-                importlib.reload(module)
-            except ImportError:
-                pass
-            datasets.extend(
-                [
-                    k
-                    for k, v in module.__dict__.items()
-                    if condition(v) and not k.startswith("_")
-                ]
-            )
-        return datasets
-
     @property
-    def datasets(self):
-        return self._list_modules(
+    def datasets(self) -> List[type[cvde.tf.Dataset]]:
+        return ws_tools.list_modules(
             "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
         )
 
     @property
     def models(self):
-        return self._list_modules(
+        return ws_tools.list_modules(
             "models", lambda v: inspect.isclass(v) and issubclass(v, tf.keras.Model)
         )
 
     @property
+    def configs(self):
+        dir = "configs"
+        configs = list(x.stem for x in pathlib.Path(dir).glob("*.yml"))
+        return configs
+
+    @property
     def jobs(self):
-        dir = "jobs"
-        jobs = list(x.stem for x in pathlib.Path(dir).glob("*.yml"))
-        return jobs
+        return ws_tools.list_modules(
+            "jobs", lambda v: inspect.isclass(v) and issubclass(v, cvde.job.Job)
+        )
 
     @property
     def losses(self):
-        return self._list_modules(
+        return ws_tools.list_modules(
             "losses",
-            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss),
-        )
-
-    @property
-    def callbacks(self):
-        return self._list_modules(
-            "callbacks",
-            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.callbacks.Callback),
-        )
-
-    @property
-    def metrics(self):
-        return self._list_modules(
-            "metrics",
-            lambda v: inspect.isclass(v) and issubclass(v, tf.keras.metrics.Metric),
-        )
-
-    @property
-    def optimizers(self):
-        return self._list_modules(
-            "optimizers",
-            lambda v: inspect.isclass(v)
-            and issubclass(v, tf.keras.optimizers.Optimizer),
+            lambda v: (inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss))
+            or hasattr(v, "__call__"),
         )
 
     def summary(self) -> str:
@@ -151,11 +166,18 @@ class Workspace:
         def print_entries(type):
             entries = ""
             for m in self.__getattribute__(type):
-                entries += f"├───{m}\n"
+                if hasattr(m, "__name__"):
+                    name = m.__name__
+                else:
+                    name = m
+                entries += f"├───{name}\n"
             return entries
 
         out += "\nJobs:\n"
         out += print_entries("jobs")
+
+        out += "\nConfigs:\n"
+        out += print_entries("configs")
 
         out += "\nDataloaders:\n"
         out += print_entries("datasets")
@@ -166,10 +188,12 @@ class Workspace:
         out += "\nLosses:\n"
         out += print_entries("losses")
 
-        out += "\nMetrics:\n"
-        out += print_entries("metrics")
-
-        out += "\nCallbacks:\n"
-        out += print_entries("callbacks")
-
         return out
+
+    def reload_modules(self):
+        # reload all modules in Workspace
+        loaded = sys.modules.copy()
+        for mod in loaded:
+            for folder in self.FOLDERS:
+                if mod.startswith(folder) or mod == folder:
+                    importlib.reload(sys.modules[mod])
