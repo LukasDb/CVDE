@@ -63,8 +63,7 @@ class Dataset(ABC):
             [sys.getsizeof(tf.io.serialize_tensor(val).numpy()) for val in one_datapoint.values()]
         )
         # shard every 500MB (compression leads to ~2x smaller files)
-        shard_every_n_datapoints = int(1000e6 / size_one_datapoint)
-
+        shard_every_n_datapoints = max(1, int(1000e6 / size_one_datapoint)) # at least one example per shard
         shard_every_n_datapoints = min(len(self), shard_every_n_datapoints) # make sure we don't shard more than the dataset size
 
         # split range into chunks of shard_every_n_datapoints
@@ -158,11 +157,6 @@ class Dataset(ABC):
         output_names = list(dtype_dict.keys())
 
         feature_description = {name: tf.io.FixedLenFeature([], tf.string) for name in output_names}
-
-        def get_data_as_tuple(data):
-            return tuple(
-                (tf.io.parse_tensor(data[name], dtype_dict[name]) for name in output_names)
-            )
 
         def get_data_as_dict(data):
             return {

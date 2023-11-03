@@ -1,1 +1,1 @@
-from .notifiy import notify, warn
+from .notify import notify, warn

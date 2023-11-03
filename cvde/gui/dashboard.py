@@ -59,6 +59,11 @@ def dashboard():
         st.code(WS().summary(), language="html")
 
     with st.expander("Device Status", expanded=True):
+        if "nvsmi_available" not in st.session_state:
+            st.session_state["nvsmi_available"] = os.system("which nvidia-smi > /dev/null") == 0
+
+        if not st.session_state["nvsmi_available"]:
+            return
         os.system("nvidia-smi > /tmp/gpu_util.txt")
 
         with open("/tmp/gpu_util.txt", "r") as f:

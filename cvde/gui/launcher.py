@@ -34,7 +34,9 @@ class Launcher:
 
         job_names = [x.__name__ for x in WS().jobs]
         job_name = bottom_row[0].selectbox("Job", job_names)
+        assert isinstance(job_name, str)
         config_name = bottom_row[1].selectbox("Config", WS().configs)
+        assert isinstance(config_name, str)
         run_name = bottom_row[2].text_input(
             "Run",
             placeholder=job_name + "_" + config_name,

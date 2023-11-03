@@ -1,5 +1,6 @@
 import logging
 import os
+import pathlib
 import subprocess
 import click
 from pathlib import Path
@@ -18,7 +19,7 @@ def run():
 def execute(name):
     "Execute a given task"
     raise NotImplementedError
-    #JobExecutor.run_job(name)
+    # JobExecutor.run_job(name)
 
 
 @run.command()
@@ -37,10 +38,9 @@ def init(name):
 
 
 @run.command()
-@click.option(
-    "-p", "--port", default="8501", help="Port to access the GUI", show_default=True
-)
-def gui(port):
+@click.option("-p", "--port", default="8501", help="Port to access the GUI", show_default=True)
+@click.argument("ROOT", type=click.Path(exists=True, path_type=pathlib.Path), default=os.getcwd())
+def gui(port: int, root: Path):
     "Run CVDE GUI in your browser"
 
     gui_file = Path(__file__).parent / "gui.py"
@@ -49,14 +49,12 @@ def gui(port):
         "--server.runOnSave",
         "true",
         "--server.port",
-        port,
-        # "--theme.base",
-        # "dark",
+        str(port),
     ]
 
     proc = subprocess.Popen(
         ["streamlit", "run", str(gui_file.resolve()), *streamlit_config],
-        cwd=os.getcwd(),
+        cwd=root,
     )
 
     try:

@@ -4,7 +4,7 @@ import shutil
 import logging
 import importlib
 from datetime import datetime
-from typing import  List
+from typing import List
 import pathlib
 import inspect
 import tensorflow as tf
@@ -44,7 +44,9 @@ class Workspace:
         try:
             self._read_state()
         except FileNotFoundError:
-            pass
+            raise FileNotFoundError(
+                f".workspace.cvde not found. Are you in a CVDE workspace? (Currently: {os.getcwd()})"
+            )
 
     @property
     def stop_queue(self):

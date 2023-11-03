@@ -34,10 +34,8 @@ def main():
     pages = [
         "Dashboard",
         "Data",
-        "Models",
         "Jobs",
         "Inspector",
-        "Deployment",
     ]
 
     if "selected_page" not in st.session_state:
@@ -77,13 +75,6 @@ def main():
         from cvde.gui.data_explorer import DataExplorer
         DataExplorer()
 
-    elif sel_p == "Models":
-        title("Model Explorer")
-        from cvde.gui.model_explorer import ModelExplorer
-
-        me = ModelExplorer()
-        me.run()
-
     elif sel_p == "Jobs":
         title("Jobs")
         from cvde.gui.launcher import Launcher
@@ -97,13 +88,6 @@ def main():
 
         jt = JobInspector()
         jt.run()
-
-    elif sel_p == "Deployment":
-        title("Deployment")
-        from cvde.gui.deployment import Deployment
-
-        dp = Deployment()
-        dp.run()
 
 
 if __name__ == "__main__":
