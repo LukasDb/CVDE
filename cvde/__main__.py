@@ -10,7 +10,7 @@ from cvde.workspace import Workspace as WS
 
 @click.group()
 def run():
-    "Computer Vision Development Enviroment"
+    "Computer Vision Development Environment"
     pass
 
 

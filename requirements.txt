@@ -1,7 +1,7 @@
 numpy
 tensorflow
 silence_tensorflow
-streamlit==1.21
+streamlit
 click
 opencv-python
 plotbbox

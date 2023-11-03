@@ -1,9 +1,7 @@
 import tensorflow as tf
 
 import sys
-from typing import Any, Iterable, Dict
 from abc import abstractmethod, ABC
-import cvde.workspace_tools as ws_tools
 from pathlib import Path
 import pickle
 import numpy as np
@@ -11,6 +9,7 @@ import multiprocessing as mp
 import tqdm
 import psutil
 
+import cvde
 
 class Dataset(ABC):
     def __init__(self) -> None:
@@ -22,11 +21,11 @@ class Dataset(ABC):
 
     @staticmethod
     def load_dataset(__dataset_name) -> type["Dataset"]:
-        return ws_tools.load_module("datasets", __dataset_name)
+        return cvde.ws_tools.load_module("datasets", __dataset_name)
 
     @abstractmethod
     def visualize_example(self, example) -> None:
-        """Specify how to visualize on (unbatched) example from the dataset
+        """Specify how to visualize on (not batched) example from the dataset
         Use streamlit to visualize the example
 
         Args:
@@ -40,7 +39,7 @@ class Dataset(ABC):
         pass
 
     @abstractmethod
-    def __getitem__(self, idx: int) -> Dict:
+    def __getitem__(self, idx: int) -> dict:
         pass
 
     def __next__(self):
@@ -63,8 +62,12 @@ class Dataset(ABC):
             [sys.getsizeof(tf.io.serialize_tensor(val).numpy()) for val in one_datapoint.values()]
         )
         # shard every 500MB (compression leads to ~2x smaller files)
-        shard_every_n_datapoints = max(1, int(1000e6 / size_one_datapoint)) # at least one example per shard
-        shard_every_n_datapoints = min(len(self), shard_every_n_datapoints) # make sure we don't shard more than the dataset size
+        shard_every_n_datapoints = max(
+            1, int(1000e6 / size_one_datapoint)
+        )  # at least one example per shard
+        shard_every_n_datapoints = min(
+            len(self), shard_every_n_datapoints
+        )  # make sure we don't shard more than the dataset size
 
         # split range into chunks of shard_every_n_datapoints
         starts = np.array_split(np.arange(len(self)), len(self) // shard_every_n_datapoints)
@@ -115,6 +118,7 @@ class Dataset(ABC):
             str((preprocess_folder / f"preprocessed_{start:04}.tfrecord").resolve()),
             options=options,
         )
+        dtype_dict = None
         for i in range(start, stop):
             data = self[i]
             if not isinstance(data, dict):
@@ -124,18 +128,20 @@ class Dataset(ABC):
 
             serialized_features = {
                 name: tf.train.Feature(
-                    bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(val).numpy()])
-                )
+                    bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(val).numpy()])  # type: ignore
+                )  # type: ignore
                 for name, val in data.items()
             }
             example_proto = tf.train.Example(
-                features=tf.train.Features(feature=serialized_features)
+                features=tf.train.Features(feature=serialized_features)  # type: ignore
             )
-            example = example_proto.SerializeToString()
+            example = example_proto.SerializeToString()  # type: ignore
 
             writer.write(example)
 
         writer.close()
+
+        assert dtype_dict is not None
 
         # only the first worker writes the dtypes
         if start == 0:

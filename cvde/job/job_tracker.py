@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from dataclasses import dataclass
 import sys
-from typing import Any, List
+from typing import Any
 import shutil
 import yaml
 import threading
@@ -108,7 +108,7 @@ class JobTracker:
     def delete_log(self):
         shutil.rmtree(self.root)
 
-    def set_tags(self, tags: List[str]):
+    def set_tags(self, tags: list[str]):
         self.tags = tags
 
         with (self.root / "log.json").open() as F:
@@ -132,7 +132,7 @@ class JobTracker:
         var_names = [x.stem for x in self.var_root.iterdir()]
         return sorted(var_names)
 
-    def read_var(self, var: str) -> List[LogEntry]:
+    def read_var(self, var: str) -> list[LogEntry]:
         # this reads everything...
         files = sorted(list((self.var_root / var).glob("*.pkl")))
         data = [pickle.load(F.open("rb")) for F in files]

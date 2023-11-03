@@ -4,7 +4,6 @@ import shutil
 import logging
 import importlib
 from datetime import datetime
-from typing import List
 import pathlib
 import inspect
 import tensorflow as tf
@@ -13,15 +12,13 @@ import streamlit as st
 
 
 import cvde
-import cvde.workspace_tools as ws_tools
-
 
 class ModuleExistsError(Exception):
     pass
 
 
 @st.cache_resource
-def persisistent_stop_queue():
+def persistent_stop_queue():
     return set()
 
 
@@ -50,7 +47,7 @@ class Workspace:
 
     @property
     def stop_queue(self):
-        return persisistent_stop_queue()
+        return persistent_stop_queue()
 
     def init_workspace(self, name: str) -> None:
         logging.info("Creating empty workspace...")
@@ -128,14 +125,14 @@ class Workspace:
         self.created = state["created"]
 
     @property
-    def datasets(self) -> List[type[cvde.tf.Dataset]]:
-        return ws_tools.list_modules(
+    def datasets(self) -> list[type[cvde.tf.Dataset]]:
+        return cvde.ws_tools.list_modules(
             "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
         )
 
     @property
     def models(self):
-        return ws_tools.list_modules(
+        return cvde.ws_tools.list_modules(
             "models", lambda v: inspect.isclass(v) and issubclass(v, tf.keras.Model)
         )
 
@@ -147,13 +144,13 @@ class Workspace:
 
     @property
     def jobs(self):
-        return ws_tools.list_modules(
+        return cvde.ws_tools.list_modules(
             "jobs", lambda v: inspect.isclass(v) and issubclass(v, cvde.job.Job)
         )
 
     @property
     def losses(self):
-        return ws_tools.list_modules(
+        return cvde.ws_tools.list_modules(
             "losses",
             lambda v: (inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss))
             or hasattr(v, "__call__"),
