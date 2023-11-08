@@ -11,3 +11,5 @@ streamlit-tags
 pyyaml
 plotly
 colorama
+tqdm
+psutil
