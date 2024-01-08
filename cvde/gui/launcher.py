@@ -1,11 +1,9 @@
-import time
-import subprocess
 import streamlit as st
 import streamlit_ace as st_ace
 from streamlit_tags import st_tags
-import pandas as pd
 from typing import List
 import pathlib
+import datetime
 
 import cvde
 import cvde.gui
@@ -37,9 +35,10 @@ class Launcher:
         assert isinstance(job_name, str)
         config_name = bottom_row[1].selectbox("Config", WS().configs)
         assert isinstance(config_name, str)
+        now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
         run_name = bottom_row[2].text_input(
             "Run",
-            placeholder=job_name + "_" + config_name,
+            placeholder=f"{now}_{job_name}_{config_name}",
             help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
         )
         with bottom_row[3]:
@@ -48,7 +47,6 @@ class Launcher:
                 text="Add tags...",
                 value=[],
             )
-
 
         if len(run_name) == 0:
             run_name = job_name + "_" + config_name
@@ -72,4 +70,6 @@ class Launcher:
         job_fn = cvde.job.Job.load_job(job_name)
         job = job_fn(config_name=config_name, run_name=run_name, tags=tags)
         job.launch()
-        cvde.gui.notify(f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'.")
+        cvde.gui.notify(
+            f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'."
+        )
