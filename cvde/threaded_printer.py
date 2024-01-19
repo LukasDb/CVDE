@@ -1,10 +1,11 @@
-import colorama
+import colorama  # type: ignore
 import threading
 from pathlib import Path
+from typing import TextIO
 
 
 class ThreadPrinter:
-    def __init__(self, stream):
+    def __init__(self, stream: TextIO) -> None:
         self.file_outs = {}
         self.colors = {}
         self.stream = stream
@@ -20,14 +21,14 @@ class ThreadPrinter:
         ]
         self.last_color_i = 0
 
-    def register_new_out(self, filepath: Path):
+    def register_new_out(self, filepath: Path) -> None:
         with self._lock:
             cur = threading.currentThread().ident
             self.file_outs[cur] = filepath.open("w")
             self.colors[cur] = self._colors[self.last_color_i % len(self._colors)]
             self.last_color_i += 1
 
-    def write(self, value):
+    def write(self, value) -> None:
         with self._lock:
             try:
                 color = self.colors[threading.currentThread().ident]
@@ -45,10 +46,10 @@ class ThreadPrinter:
             except KeyError:
                 pass
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         return other is self.stream
 
-    def flush(self):
+    def flush(self) -> None:
         with self._lock:
             try:
                 file = self.file_outs[threading.currentThread().ident]

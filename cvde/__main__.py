@@ -9,14 +9,14 @@ from cvde.workspace import Workspace as WS
 
 
 @click.group()
-def run():
+def run() -> None:
     "Computer Vision Development Environment"
     pass
 
 
 @run.command()
 @click.argument("name")
-def execute(name):
+def execute(name: str) -> None:
     "Execute a given task"
     raise NotImplementedError
     # JobExecutor.run_job(name)
@@ -25,14 +25,14 @@ def execute(name):
 @run.command()
 @click.argument("type")
 @click.argument("name")
-def create(type, name):
+def create(type: str, name: str) -> None:
     "Create a new module of type {data|model|config|task}"
-    create(type, name)
+    raise NotImplementedError
 
 
 @run.command()
 @click.option("-n", "--name", help="Name of the workspace")
-def init(name):
+def init(name: str) -> None:
     "Create an empty workspace"
     WS().init_workspace(name)
 
@@ -40,7 +40,7 @@ def init(name):
 @run.command()
 @click.option("-p", "--port", default="8501", help="Port to access the GUI", show_default=True)
 @click.argument("ROOT", type=click.Path(exists=True, path_type=pathlib.Path), default=os.getcwd())
-def gui(port: int, root: Path):
+def gui(port: int, root: Path) -> None:
     "Run CVDE GUI in your browser"
 
     gui_file = Path(__file__).parent / "gui.py"
@@ -67,5 +67,5 @@ def gui(port: int, root: Path):
         proc.kill()
 
 
-def summary():
+def summary() -> None:
     print(WS().summary())

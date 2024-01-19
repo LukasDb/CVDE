@@ -9,21 +9,20 @@ import inspect
 import tensorflow as tf
 import sys
 import streamlit as st
-
-
 import cvde
+
 
 class ModuleExistsError(Exception):
     pass
 
 
 @st.cache_resource
-def persistent_stop_queue():
+def persistent_stop_queue() -> set:
     return set()
 
 
 class Workspace:
-    _instance = None
+    _instance: "Workspace|None" = None
     FOLDERS = [
         "models",
         "datasets",
@@ -118,7 +117,7 @@ class Workspace:
         with pathlib.Path(".vscode/launch.json").open("w") as F:
             json.dump(launch_config, F, indent=4)
 
-    def _read_state(self):
+    def _read_state(self) -> None:
         with open(".workspace.cvde") as F:
             state = json.load(F)
         self.name = state["name"]

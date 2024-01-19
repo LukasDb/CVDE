@@ -3,7 +3,6 @@ import os
 
 import silence_tensorflow.auto
 import tensorflow as tf
-import itertools as it
 
 gpus = tf.config.experimental.list_physical_devices("GPU")
 if gpus:

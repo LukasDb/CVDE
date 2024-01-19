@@ -14,7 +14,7 @@ class Job(ABC):
         config_name: Union[str, None] = None,
         folder_name: Union[str, None] = None,
         tags: list[str] = []
-    ):
+    ) -> None:
         self.name = self.__class__.__name__
         if folder_name is not None and config_name is None:
             self.tracker = cvde.job.JobTracker.from_log(folder_name)
@@ -28,26 +28,22 @@ class Job(ABC):
 
         self._stop_queue = cvde.WS().stop_queue
 
-    @staticmethod
-    def load_job(__job_name) -> type["Job"]:
-        return cvde.ws_tools.load_module("jobs", __job_name)
-
-    def stop(self):
+    def stop(self) -> None:
         self._stop_queue.add(self.tracker.ident)
 
-    def is_stopped(self):
+    def is_stopped(self) -> bool:
         if self.tracker.ident in self._stop_queue:
             self._stop_queue.remove(self.tracker.ident)
             return True
         else:
             return False
 
-    def launch(self):
+    def launch(self) -> None:
         """non-blocking launch job"""
         job_thread = threading.Thread(target=self._run, name="thread_" + self.tracker.unique_name)
         job_thread.start()
 
-    def _run(self):
+    def _run(self) -> None:
         """runs in thread"""
         self.tracker.set_thread_ident()
         assert isinstance(sys.stdout, cvde.ThreadPrinter)
@@ -59,5 +55,5 @@ class Job(ABC):
         cvde.gui.notify("Job finished: ", self.name)
 
     @abstractmethod
-    def run(self):
+    def run(self) -> None:
         pass

@@ -1,6 +1,6 @@
 import streamlit as st
-import streamlit_ace as st_ace
-from streamlit_tags import st_tags
+import streamlit_ace as st_ace  # type: ignore
+from streamlit_tags import st_tags  # type: ignore
 from typing import List
 import pathlib
 import datetime
@@ -26,7 +26,7 @@ class Launcher:
         self.configs = list(WS().configs)
         self.configs.sort()
 
-    def run(self):
+    def run(self) -> None:
         top_row = st.columns([1, 1, 1, 1, 1])
         bottom_row = st.columns([1, 1, 1, 1, 1])
 
@@ -65,9 +65,9 @@ class Launcher:
             with config_path.open("w") as F:
                 F.write(new_config)
 
-    def launch_job(self, job_name, config_name, run_name, tags: List[str]):
+    def launch_job(self, job_name, config_name, run_name, tags: List[str]) -> None:
         WS().reload_modules()
-        job_fn = cvde.job.Job.load_job(job_name)
+        job_fn = cvde.ws_tools.load_job(job_name)
         job = job_fn(config_name=config_name, run_name=run_name, tags=tags)
         job.launch()
         cvde.gui.notify(

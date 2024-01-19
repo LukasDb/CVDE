@@ -2,12 +2,13 @@ import time
 import os
 import itertools as it
 import streamlit as st
+import cvde
 from cvde.job import Job, JobTracker
 from cvde.workspace import Workspace as WS
 from cvde.gui import warn
 
 
-def dashboard():
+def dashboard() -> None:
     try:
         runs = os.listdir("log")
         trackers = [JobTracker.from_log(run) for run in runs]
@@ -16,7 +17,9 @@ def dashboard():
     except KeyError:
         trackers = []
 
-    running_jobs = [Job.load_job(t.job_name)(folder_name=t.folder_name) for t in trackers]
+    running_jobs = [
+        cvde.ws_tools.load_job(t.job_name)(folder_name=t.folder_name) for t in trackers
+    ]
 
     with st.expander("Runs", expanded=True):
         cols = it.cycle(st.columns(2))

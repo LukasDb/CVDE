@@ -1,4 +1,4 @@
-import tensorflow as tf
+import tensorflow as tf # type: ignore
 
 import sys
 from abc import abstractmethod, ABC
@@ -11,17 +11,14 @@ import psutil
 
 import cvde
 
+
 class Dataset(ABC):
     def __init__(self) -> None:
         super().__init__()
         self._current_idx = 0
 
-    def __iter__(self):
+    def __iter__(self) -> "Dataset":
         return self
-
-    @staticmethod
-    def load_dataset(__dataset_name) -> type["Dataset"]:
-        return cvde.ws_tools.load_module("datasets", __dataset_name)
 
     @abstractmethod
     def visualize_example(self, example) -> None:
@@ -172,7 +169,7 @@ class Dataset(ABC):
         def parse_tfrecord(example_proto):
             return tf.io.parse_single_example(example_proto, feature_description)
 
-        # SHARDED tfrecord
+        # chunked tfrecords
         files = tf.io.matching_files(str(preprocess_folder / "preprocessed_*.tfrecord"))
 
         shards = tf.data.Dataset.from_tensor_slices(files)
