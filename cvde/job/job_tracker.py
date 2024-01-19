@@ -21,7 +21,7 @@ class LogEntry:
 
 
 class JobTracker:
-    def __init__(self, folder_name):
+    def __init__(self, folder_name: str) -> None:
         with Path("log/" + folder_name + "/log.json").open() as F:
             meta = json.load(F)
 
@@ -38,7 +38,7 @@ class JobTracker:
         self.stderr_file = self.root / "stderr.txt"
 
     @staticmethod
-    def from_log(folder_name):
+    def from_log(folder_name: str) -> "JobTracker":
         tracker = JobTracker(folder_name)
         return tracker
 
@@ -48,7 +48,7 @@ class JobTracker:
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
         unique_hash = hash(now) + sys.maxsize + 1
-        folder_name = job_name + "_" + str(unique_hash)
+        folder_name = run_name + "_" + str(unique_hash)
         root = Path("log/" + folder_name)
 
         var_root = root / "vars"
@@ -99,16 +99,16 @@ class JobTracker:
             meta = yaml.safe_load(F)
         return meta
 
-    def get_stderr(self):
+    def get_stderr(self) -> str:
         return self.stderr_file.read_text()
 
-    def get_stdout(self):
+    def get_stdout(self) -> str:
         return self.stdout_file.read_text()
 
-    def delete_log(self):
+    def delete_log(self) -> None:
         shutil.rmtree(self.root)
 
-    def set_tags(self, tags: list[str]):
+    def set_tags(self, tags: list[str]) -> None:
         self.tags = tags
 
         with (self.root / "log.json").open() as F:
