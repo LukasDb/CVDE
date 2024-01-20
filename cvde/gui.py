@@ -1,23 +1,11 @@
 import sys
 import os
 
-import silence_tensorflow.auto
-import tensorflow as tf
-
-gpus = tf.config.experimental.list_physical_devices("GPU")
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        print(e)
-
-
 import streamlit as st
 from datetime import datetime
+import cvde
 from cvde.workspace import Workspace as WS
 import requests
-from cvde.threaded_printer import ThreadPrinter
 
 
 def main():
@@ -63,28 +51,22 @@ def main():
     sel_p = st.session_state["selected_page"]
     if sel_p == "Dashboard":
         title("Dashboard")
-        from cvde.gui.dashboard import dashboard
-
-        dashboard()
+        db = cvde.gui.Dashboard()
+        db.run()
 
     elif sel_p == "Data":
         title("Data Explorer")
-        from cvde.gui.data_explorer import DataExplorer
-
-        DataExplorer()
+        de = cvde.gui.DataExplorer()
+        de.run()
 
     elif sel_p == "Jobs":
         title("Jobs")
-        from cvde.gui.launcher import Launcher
-
-        jm = Launcher()
+        jm = cvde.gui.Launcher()
         jm.run()
 
     elif sel_p == "Inspector":
         title("Inspector")
-        from cvde.gui.job_inspector import JobInspector
-
-        jt = JobInspector()
+        jt = cvde.gui.JobInspector()
         jt.run()
 
 
@@ -98,15 +80,4 @@ if __name__ == "__main__":
             "About": "Tool to manage CV experiments and training deep learning models.",
         },
     )
-
-    @st.cache_resource
-    def get_stdout_threadprinter():
-        return ThreadPrinter(sys.stdout)
-
-    @st.cache_resource
-    def get_stderr_threadprinter():
-        return ThreadPrinter(sys.stderr)
-
-    sys.stdout = get_stdout_threadprinter()
-    sys.stderr = get_stderr_threadprinter()
     main()

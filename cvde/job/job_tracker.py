@@ -10,6 +10,7 @@ import shutil
 import yaml
 import threading
 from PIL import Image
+import numpy as np
 
 
 @dataclass
@@ -43,7 +44,7 @@ class JobTracker:
         return tracker
 
     @staticmethod
-    def create(job_name: str, config_name: str, run_name: str):
+    def create(job_name: str, config_name: str, run_name: str) -> "JobTracker":
         """creates folder structure for run"""
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
@@ -81,20 +82,20 @@ class JobTracker:
         return tracker
 
     @property
-    def unique_name(self):
+    def unique_name(self) -> str:
         return self.folder_name
 
     @property
-    def display_name(self):
+    def display_name(self) -> str:
         in_progress = "🔴 " if self.in_progress else ""
         return f"{in_progress}{self.name} ({self.started})"
 
     @property
-    def in_progress(self):
+    def in_progress(self) -> bool:
         return "thread_" + self.unique_name in [t.name for t in threading.enumerate()]
 
     @property
-    def config(self):
+    def config(self) -> Any:
         with (self.root / "job.yml").open() as F:
             meta = yaml.safe_load(F)
         return meta
@@ -117,7 +118,7 @@ class JobTracker:
         with (self.root / "log.json").open("w") as F:
             json.dump(data, F, indent=2)
 
-    def set_thread_ident(self):
+    def set_thread_ident(self) -> None:
         # ident = threading.get_ident()
         ident = os.getpid()
         self.ident = ident
@@ -128,7 +129,7 @@ class JobTracker:
             json.dump(data, F, indent=2)
 
     @property
-    def vars(self):
+    def vars(self) -> list[str]:
         var_names = [x.stem for x in self.var_root.iterdir()]
         return sorted(var_names)
 
@@ -139,12 +140,12 @@ class JobTracker:
         data = [LogEntry(**d) for d in data]
         return data
 
-    def log(self, name, var, index=None):
+    def log(self, name: str, var: np.ndarray, index: int | None = None) -> None:
         """log variable"""
         var_folder = self.var_root / name
         var_folder.mkdir(exist_ok=True)
 
-        index = len(var_folder.iterdir()) if index is None else index
+        index = len(list(var_folder.iterdir())) if index is None else index
 
         var_path = self.var_root / name / f"{index:06}.pkl"
 

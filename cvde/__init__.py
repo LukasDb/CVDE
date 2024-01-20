@@ -4,14 +4,50 @@ __credits__ = "TUM"
 
 __entry_points__ = {"console_scripts": ["cvde = cvde.__main__:run"]}
 
-import cvde.tf as tf
+# setup mp
+import multiprocessing as mp
+import os
+
+try:
+    mp.set_start_method("spawn")
+except RuntimeError:
+    pass
+
+# setup tensorflow
+if mp.current_process().name == "MainProcess":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+
+import silence_tensorflow.auto
+import tensorflow as tf
+
+# --- constants definition ---
+import typing
+from typing import Any
+
+
+# class types:
+#     LOSS_TYPE = tf.keras.losses.Loss | typing.Callable[[Any], Any]
+
+
+# --- modules ---
 import cvde.workspace_tools as ws_tools
-
-
+from cvde.dataset import Dataset
 import cvde.gui as gui
-
-from cvde.workspace import Workspace as WS
 import cvde.job as job
 from cvde.threaded_printer import ThreadPrinter
 
-__all__ = ["gui", "tf", "job", "ws_tools", "WS", "ThreadPrinter"]
+# --- colored printing for different processes ---
+import sys
+
+sys.stdout = ThreadPrinter(sys.stdout)
+sys.stderr = ThreadPrinter(sys.stderr)
+
+__all__ = [
+    "types",
+    "ws_tools",
+    "Dataset",
+    "gui",
+    "job",
+    "ThreadPrinter",
+]

@@ -5,8 +5,6 @@ import subprocess
 import click
 from pathlib import Path
 
-from cvde.workspace import Workspace as WS
-
 
 @click.group()
 def run() -> None:
@@ -19,7 +17,6 @@ def run() -> None:
 def execute(name: str) -> None:
     "Execute a given task"
     raise NotImplementedError
-    # JobExecutor.run_job(name)
 
 
 @run.command()

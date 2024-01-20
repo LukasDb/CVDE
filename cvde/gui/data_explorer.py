@@ -1,22 +1,27 @@
 import streamlit as st
+from typing import Any
 
 import cvde
 from cvde.workspace import Workspace as WS
-import cvde.workspace_tools as ws_tools
 
 
 class DataExplorer:
     def __init__(self) -> None:
+        pass
+
+    def run(self) -> None:
         if "data_index" not in st.session_state:
             st.session_state["data_index"] = 0
 
         data_loaders = [x.__name__ for x in WS().datasets]
-        configs = WS().configs
+        configs = WS().list_configs()
 
         # build data viewer
         col1, col2, col3 = st.columns(3)
         dataset_name = col1.selectbox("Data source", data_loaders, on_change=self.reset)
         config_name = col2.selectbox("Config", configs, on_change=self.reset)
+        if config_name is None:
+            return
 
         # reloads page, progresses through iterable dataset
         buttons = col3.columns(3)
@@ -24,7 +29,7 @@ class DataExplorer:
         buttons[1].button("Next", on_click=self.inc_data_index)
         buttons[2].button("Reset", on_click=self.reset)
 
-        config = ws_tools.load_config(config_name)
+        config = cvde.ws_tools.load_config(config_name)
         config = config.get(dataset_name, {})
 
         if dataset_name is None:
@@ -44,7 +49,7 @@ class DataExplorer:
         dataset.visualize_example(data)
 
     @st.cache_data(show_spinner="Loading data...")
-    def get_data(_self, _dataset: cvde.tf.Dataset, data_index: int) -> dict:
+    def get_data(_self, _dataset: cvde.Dataset, data_index: int) -> Any:
         return _dataset[data_index]
 
     def inc_data_index(self) -> None:

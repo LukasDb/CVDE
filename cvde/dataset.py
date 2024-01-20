@@ -1,5 +1,4 @@
-import tensorflow as tf # type: ignore
-
+import tensorflow as tf
 import sys
 from abc import abstractmethod, ABC
 from pathlib import Path
@@ -8,8 +7,7 @@ import numpy as np
 import multiprocessing as mp
 import tqdm
 import psutil
-
-import cvde
+from typing import Any
 
 
 class Dataset(ABC):
@@ -21,7 +19,7 @@ class Dataset(ABC):
         return self
 
     @abstractmethod
-    def visualize_example(self, example) -> None:
+    def visualize_example(self, example: dict[str, tf.Tensor]) -> None:
         """Specify how to visualize on (not batched) example from the dataset
         Use streamlit to visualize the example
 
@@ -39,7 +37,7 @@ class Dataset(ABC):
     def __getitem__(self, idx: int) -> dict:
         pass
 
-    def __next__(self):
+    def __next__(self) -> dict[str, tf.Tensor]:
         try:
             data = self[self._current_idx]
         except IndexError:
@@ -47,7 +45,7 @@ class Dataset(ABC):
         self._current_idx += 1
         return data
 
-    def cache(self, preprocess_folder: Path):
+    def cache(self, preprocess_folder: Path) -> None:
         """Iterates through the dataset and saves it to a tfrecord file in the specified folder.
         This requires the dataset to return dictionaries of tensors."""
         if not preprocess_folder.exists():
@@ -99,7 +97,7 @@ class Dataset(ABC):
         for worker in workers:
             worker.join()
 
-    def process(self, process_queue: mp.Queue):
+    def process(self, process_queue: mp.Queue) -> None:
         """get queue stop when receive None, otherwise run _cache_index_range"""
         while True:
             job = process_queue.get()
@@ -108,8 +106,8 @@ class Dataset(ABC):
             self._cache_index_range(*job)
 
     def _cache_index_range(
-        self, start, stop, preprocess_folder: Path  # shard_every_n_datapoints: int
-    ):
+        self, start: int, stop: int, preprocess_folder: Path  # shard_every_n_datapoints: int
+    ) -> None:
         options = tf.io.TFRecordOptions(compression_type="ZLIB")
         writer = tf.io.TFRecordWriter(
             str((preprocess_folder / f"preprocessed_{start:04}.tfrecord").resolve()),
@@ -161,12 +159,12 @@ class Dataset(ABC):
 
         feature_description = {name: tf.io.FixedLenFeature([], tf.string) for name in output_names}
 
-        def get_data_as_dict(data):
+        def get_data_as_dict(data: dict) -> dict[str, tf.Tensor]:
             return {
                 name: tf.io.parse_tensor(data[name], dtype_dict[name]) for name in output_names
             }
 
-        def parse_tfrecord(example_proto):
+        def parse_tfrecord(example_proto: Any) -> Any:
             return tf.io.parse_single_example(example_proto, feature_description)
 
         # chunked tfrecords

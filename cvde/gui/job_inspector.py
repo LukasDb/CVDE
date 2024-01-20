@@ -75,10 +75,7 @@ class JobInspector:
         trackers.sort(key=lambda t: t.started, reverse=True)
 
         # extract variable names
-        var_names = []
-        for t in trackers:
-            var_names.extend(t.vars)
-        var_names = np.unique(var_names)
+        var_names = np.unique([var_name for t in trackers for var_name in t.vars])
 
         if len(trackers) > 0:
             cols = st.columns(len(trackers))

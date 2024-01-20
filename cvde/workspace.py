@@ -2,14 +2,9 @@ import json
 import os
 import shutil
 import logging
-import importlib
 from datetime import datetime
 import pathlib
-import inspect
-import tensorflow as tf
-import sys
 import streamlit as st
-import cvde
 
 
 class ModuleExistsError(Exception):
@@ -31,9 +26,9 @@ class Workspace:
         "configs",
     ]
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls) -> "Workspace":
         if cls._instance is None:
-            cls._instance = super(Workspace, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(Workspace, cls).__new__(cls)
         return cls._instance
 
     def __init__(self) -> None:
@@ -43,10 +38,6 @@ class Workspace:
             raise FileNotFoundError(
                 f".workspace.cvde not found. Are you in a CVDE workspace? (Currently: {os.getcwd()})"
             )
-
-    @property
-    def stop_queue(self):
-        return persistent_stop_queue()
 
     def init_workspace(self, name: str) -> None:
         logging.info("Creating empty workspace...")
@@ -123,75 +114,17 @@ class Workspace:
         self.name = state["name"]
         self.created = state["created"]
 
-    @property
-    def datasets(self) -> list[type[cvde.tf.Dataset]]:
-        return cvde.ws_tools.list_modules(
-            "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
-        )
+    def list_jobs(self) -> list[str]:
+        """find Names of cvde.job.Job subclasses in jobs/"""
+        jobs = []
+        for file in pathlib.Path("jobs").iterdir():
+            if file.is_file() and file.suffix == ".py" and file.stem != "__init__":
+                jobs.append(file.stem)
+        return jobs
 
-    @property
-    def models(self):
-        return cvde.ws_tools.list_modules(
-            "models", lambda v: inspect.isclass(v) and issubclass(v, tf.keras.Model)
-        )
-
-    @property
-    def configs(self):
-        dir = "configs"
-        configs = list(x.stem for x in pathlib.Path(dir).glob("*.yml"))
+    def list_configs(self) -> list[str]:
+        configs = []
+        for file in pathlib.Path("configs").iterdir():
+            if file.is_file() and file.suffix == ".yml":
+                configs.append(file.stem)
         return configs
-
-    @property
-    def jobs(self):
-        return cvde.ws_tools.list_modules(
-            "jobs", lambda v: inspect.isclass(v) and issubclass(v, cvde.job.Job)
-        )
-
-    @property
-    def losses(self):
-        return cvde.ws_tools.list_modules(
-            "losses",
-            lambda v: (inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss))
-            or hasattr(v, "__call__"),
-        )
-
-    def summary(self) -> str:
-        # print summary of workspace
-        out = ""
-        out += "-- Workspace summary --\n"
-        out += "Created: " + self.created + "\n"
-
-        def print_entries(type):
-            entries = ""
-            for m in self.__getattribute__(type):
-                if hasattr(m, "__name__"):
-                    name = m.__name__
-                else:
-                    name = m
-                entries += f"├───{name}\n"
-            return entries
-
-        out += "\nJobs:\n"
-        out += print_entries("jobs")
-
-        out += "\nConfigs:\n"
-        out += print_entries("configs")
-
-        out += "\nDataloaders:\n"
-        out += print_entries("datasets")
-
-        out += "\nModels:\n"
-        out += print_entries("models")
-
-        out += "\nLosses:\n"
-        out += print_entries("losses")
-
-        return out
-
-    def reload_modules(self):
-        # reload all modules in Workspace
-        loaded = sys.modules.copy()
-        for mod in loaded:
-            for folder in self.FOLDERS:
-                if mod.startswith(folder) or mod == folder:
-                    importlib.reload(sys.modules[mod])
