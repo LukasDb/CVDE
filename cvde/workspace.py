@@ -1,10 +1,13 @@
 import json
+import importlib
 import os
 import shutil
 import logging
 from datetime import datetime
 import pathlib
 import streamlit as st
+import cvde
+import inspect
 
 
 class ModuleExistsError(Exception):
@@ -128,3 +131,16 @@ class Workspace:
             if file.is_file() and file.suffix == ".yml":
                 configs.append(file.stem)
         return configs
+
+    def list_datasets(self) -> dict[str, type[cvde.tf.Dataset]]:
+        def is_cvde_dataset(cls: type) -> bool:
+            return inspect.isclass(cls) and issubclass(cls, cvde.tf.Dataset)
+
+        datasets: dict[str, type[cvde.tf.Dataset]] = {}
+        for file in pathlib.Path("datasets").iterdir():
+            if file.is_file() and file.suffix == ".py" and file.stem != "__init__":
+                submodule = importlib.import_module(f"datasets.{file.stem}")
+                importlib.reload(submodule)
+                ds = inspect.getmembers(submodule, is_cvde_dataset)
+                datasets.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
+        return datasets

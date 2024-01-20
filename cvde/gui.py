@@ -4,70 +4,74 @@ import os
 import streamlit as st
 from datetime import datetime
 import cvde
-from cvde.workspace import Workspace as WS
+from cvde import Workspace as WS
+from gui.page import Page
 import requests
 
 
-def main():
-    sys.path.append(os.getcwd())
+class GUI:
+    def __init__(self) -> None:
+        sys.path.append(os.getcwd())
 
-    style_file = os.path.join(os.path.dirname(__file__), "style.css")
-    with open(style_file) as F:
-        style = F.read()
-    st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
+        style_file = os.path.join(os.path.dirname(__file__), "style.css")
+        with open(style_file) as F:
+            style = F.read()
+        st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
 
-    pages = [
-        "Dashboard",
-        "Data",
-        "Jobs",
-        "Inspector",
-    ]
+        pages: dict[str, Page] = {
+            "Dashboard": cvde.gui.Dashboard(),
+            "Data": cvde.gui.DataExplorer(),
+            "Launcher": cvde.gui.Launcher(),
+            "Inspector": cvde.gui.JobInspector(),
+        }
 
-    if "selected_page" not in st.session_state:
-        st.session_state["selected_page"] = pages[0]
+        if "selected_page" not in st.session_state:
+            st.session_state["selected_page"] = "Dashboard"
 
-    cols = st.columns(len(pages) + 1)
-    cols[0].text("")
-    cols[0].markdown(f"**{WS().name}**")
+        cols = st.columns(len(pages) + 1)
+        cols[0].text("")
+        cols[0].markdown(f"**{WS().name}**")
 
-    for col, page in zip(cols[1:], pages):
-        col.write("""<div class='PortMarker'/>""", unsafe_allow_html=True)
-        if col.button(f"**{page}**", use_container_width=True):
-            st.session_state["selected_page"] = page
+        for col, page_name in zip(cols[1:], pages.keys()):
+            col.write("""<div class='PortMarker'/>""", unsafe_allow_html=True)
+            if col.button(f"**{page_name}**", use_container_width=True):
+                # chose a page
+                last_page_name = st.session_state["selected_page"]
+                if page_name != last_page_name:
+                    pages[last_page_name].on_leave()
+                st.session_state["selected_page"] = page_name
 
-    def title(t):
-        try:
-            current_weather = requests.get(
-                "http://www.wttr.in", params={"format": "%c %t"}, timeout=1.0
-            ).text
-        except Exception:
-            current_weather = ""
+        active_page_name = st.session_state["selected_page"]
+
+        self.title(active_page_name)
+        pages[active_page_name].run()
+
+    def title(self, t: str) -> None:
+        if "weather" not in st.session_state:
+            st.session_state["weather"] = ""
+
+        if "last_weather_update" not in st.session_state:
+            st.session_state["last_weather_update"] = datetime.now()
+
+        if (datetime.now() - st.session_state["last_weather_update"]).seconds > 60:
+            # update weather
+            try:
+                current_weather = requests.get(
+                    "http://www.wttr.in", params={"format": "%c %t"}, timeout=0.5
+                ).text
+                st.session_state["last_weather_update"] = datetime.now()
+            except Exception:
+                current_weather = ""
+            st.session_state["weather"] = current_weather
+
+        current_weather = st.session_state["weather"]
 
         st.title(t, anchor=False)
         c1, c2 = st.columns([1, 20])
         c1.button("⟳", key=t + "_reload")
-        c2.markdown(f'{current_weather} *Last update: {datetime.now().strftime("%H:%M:%S")}*')
-
-    sel_p = st.session_state["selected_page"]
-    if sel_p == "Dashboard":
-        title("Dashboard")
-        db = cvde.gui.Dashboard()
-        db.run()
-
-    elif sel_p == "Data":
-        title("Data Explorer")
-        de = cvde.gui.DataExplorer()
-        de.run()
-
-    elif sel_p == "Jobs":
-        title("Jobs")
-        jm = cvde.gui.Launcher()
-        jm.run()
-
-    elif sel_p == "Inspector":
-        title("Inspector")
-        jt = cvde.gui.JobInspector()
-        jt.run()
+        c2.markdown(
+            f'{current_weather} *Last update: {st.session_state["last_weather_update"].strftime("%H:%M:%S")}*'
+        )
 
 
 if __name__ == "__main__":
@@ -80,4 +84,4 @@ if __name__ == "__main__":
             "About": "Tool to manage CV experiments and training deep learning models.",
         },
     )
-    main()
+    GUI()

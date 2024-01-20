@@ -24,7 +24,7 @@ This project aims to provide a framework for Computer Vision experiments. The fr
 - Never define default values for parameters in your code.
 
 **Datasets**
-- Datasets should inherit from `cvde.Dataset`. Implement `__init__`, `__getitem__`, `__len__` and `visualize_example` methods.
+- Datasets should inherit from `cvde.tf.Dataset`. Implement `__init__`, `__getitem__`, `__len__` and `visualize_example` methods.
 - `__getitem__` should return a dict that contains tensors or np.arrays, then you can use `.from_cache()` and `.cache()` to load your dataset into a sharded tfrecord dataset for better performance.
 - In `visualize_example` use functions from [streamlit](https://streamlit.io) to visualize one example of your datase, as returned by `__getitem__`. This will be used in the Data explorer of the GUI
 

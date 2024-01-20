@@ -7,6 +7,9 @@ import cvde
 from typing import Callable
 import tensorflow as tf
 
+from cvde.job import Job
+from cvde.tf import Dataset
+
 
 def list_modules(base_module: str, condition: Union[Callable[[Any], bool], None] = None) -> list:
     loaded = sys.modules.copy()
@@ -39,9 +42,7 @@ def list_modules(base_module: str, condition: Union[Callable[[Any], bool], None]
     return modules
 
 
-def load_module(
-    base_module: str, module_name: str
-) -> Union[type["cvde.Dataset"], type["cvde.job.Job"]]:
+def load_module(base_module: str, module_name: str) -> Union[type[Dataset], type[Job]]:
     modules = list_modules(base_module, lambda x: getattr(x, "__name__", "") == module_name)
     if len(modules) == 0:
         raise ImportError(f"Could not find module {module_name} in {base_module}")
@@ -52,19 +53,21 @@ def load_module(
     return module
 
 
-def load_job(__job_name: str) -> type["cvde.job.Job"]:
+def load_job(__job_name: str) -> type[Job]:
+    """finds first cvde.job.Job in jobs.<job_name>"""
     module = importlib.import_module("jobs." + __job_name)
-    # find cvde.job.Job subclass in module
     for k, v in module.__dict__.items():
-        if isinstance(v, type) and issubclass(v, cvde.job.Job):
+        if isinstance(v, type) and issubclass(v, Job):
             return v
     raise ImportError(f"Could not find Job in {__job_name}")
 
 
-def load_dataset(__dataset_name: str) -> type["cvde.Dataset"]:
-    ds_module = cvde.ws_tools.load_module("datasets", __dataset_name)
-    assert issubclass(ds_module, cvde.Dataset)
-    return ds_module
+def load_dataset(__dataset_name: str) -> type[Dataset]:
+    module = importlib.import_module("datasets." + __dataset_name)
+    for k, v in module.__dict__.items():
+        if isinstance(v, type) and issubclass(v, Dataset):
+            return v
+    raise ImportError(f"Could not find Dataset in {__dataset_name}")
 
 
 def load_model(__model_name: str) -> "type[tf.keras.Model]":

@@ -19,7 +19,7 @@ if mp.current_process().name == "MainProcess":
 
 
 import silence_tensorflow.auto
-import tensorflow as tf
+import tensorflow
 
 # --- constants definition ---
 import typing
@@ -32,9 +32,10 @@ from typing import Any
 
 # --- modules ---
 import cvde.workspace_tools as ws_tools
-from cvde.dataset import Dataset
+import cvde.tf as tf
 import cvde.gui as gui
 import cvde.job as job
+from cvde.workspace import Workspace
 from cvde.threaded_printer import ThreadPrinter
 
 # --- colored printing for different processes ---

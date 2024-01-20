@@ -19,11 +19,14 @@ class ThreadPrinter:
     ]
 
     def __init__(self, stream: TextIO) -> None:
-        self.file_output: dict[str, TextIO] = {} # TODO this with multiprocessing does not work probably
+        # note: file_paths is not synchronized across processes, but because each process
+        #      only needs to access its own file_path, this is not a problem
+        self.file_paths: dict[str, Path] = {}
         self.reset_color = colorama.Fore.RESET
+        self.stream = stream
 
-    def register_new_out(self, file: TextIO) -> None:
-        self.file_output[mp.current_process().name] = file
+    def register_new_out(self, file_path: Path) -> None:
+        self.file_paths[mp.current_process().name] = file_path
 
     def write(self, value: str) -> None:
         result = re.search("[0-9]+", mp.current_process().name)
@@ -35,10 +38,10 @@ class ThreadPrinter:
         self.stream.write(color + value + self.reset_color)
         self.stream.flush()
 
-        if mp.current_process().name in self.file_output:
-            file_output = self.file_output[mp.current_process().name]
-            file_output.write(value)
-            file_output.flush()
+        if mp.current_process().name in self.file_paths:
+            file_path = self.file_paths[mp.current_process().name]
+            with file_path.open("a") as F:
+                F.write(value)
 
     def __eq__(self, other: object) -> bool:
         assert hasattr(self, "stream")
@@ -46,8 +49,6 @@ class ThreadPrinter:
 
     def flush(self) -> None:
         self.stream.flush()
-        for file_output in self.file_output.values():
-            file_output.flush()
 
 
 class __ThreadPrinter:

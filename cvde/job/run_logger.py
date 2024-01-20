@@ -1,14 +1,15 @@
 import json
+import multiprocessing as mp
+from multiprocessing.process import BaseProcess
 import pickle
 from datetime import datetime
-import os
 from pathlib import Path
 from dataclasses import dataclass
 import sys
 from typing import Any
 import shutil
 import yaml
-import threading
+
 from PIL import Image
 import numpy as np
 
@@ -21,9 +22,9 @@ class LogEntry:
     is_image: bool
 
 
-class JobTracker:
+class RunLogger:
     def __init__(self, folder_name: str) -> None:
-        with Path("log/" + folder_name + "/log.json").open() as F:
+        with Path("log/" + folder_name + "/log.json").open("r") as F:
             meta = json.load(F)
 
         self.folder_name = folder_name
@@ -31,20 +32,20 @@ class JobTracker:
         self.job_name = meta["job"]
         self.started = meta["started"]
         self.tags = meta["tags"]
+        self.pid = int(meta.get("pid", -1))
         self.root = Path("log/" + self.folder_name)
         self.var_root = self.root / "vars"
         self.weights_root = self.root / "weights"
-        self.ident = meta["ident"]
         self.stdout_file = self.root / "stdout.txt"
         self.stderr_file = self.root / "stderr.txt"
 
     @staticmethod
-    def from_log(folder_name: str) -> "JobTracker":
-        tracker = JobTracker(folder_name)
+    def from_log(folder_name: str) -> "RunLogger":
+        tracker = RunLogger(folder_name)
         return tracker
 
     @staticmethod
-    def create(job_name: str, config_name: str, run_name: str) -> "JobTracker":
+    def create(job_name: str, config_name: str, run_name: str) -> "RunLogger":
         """creates folder structure for run"""
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
@@ -66,33 +67,34 @@ class JobTracker:
         job_config_path = Path("configs") / (config_name + ".yml")
         shutil.copy(job_config_path, root / "job.yml")
 
-        started = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         meta = {
             "job": job_name,
             "name": run_name,
             "started": started,
+            "pid": str(mp.current_process().pid),
             "tags": [],
-            "ident": None,
         }
 
         with (root / "log.json").open("w") as F:
             json.dump(meta, F, indent=2)
 
-        tracker = JobTracker(folder_name)
+        tracker = RunLogger(folder_name)
         return tracker
 
     @property
-    def unique_name(self) -> str:
-        return self.folder_name
-
-    @property
     def display_name(self) -> str:
-        in_progress = "🔴 " if self.in_progress else ""
-        return f"{in_progress}{self.name} ({self.started})"
+        in_progress = "🔴 " if self.is_in_progress() else ""
+        return f"{in_progress} {self.name} ({self.started})"
 
-    @property
-    def in_progress(self) -> bool:
-        return "thread_" + self.unique_name in [t.name for t in threading.enumerate()]
+    def is_in_progress(self) -> bool:
+        return self.pid in [p.pid for p in mp.active_children()]
+
+    def get_mp_process(self) -> BaseProcess:
+        for p in mp.active_children():
+            if p.pid == self.pid:
+                return p
+        raise Exception("Process not found")
 
     @property
     def config(self) -> Any:
@@ -115,16 +117,6 @@ class JobTracker:
         with (self.root / "log.json").open() as F:
             data = json.load(F)
         data["tags"] = tags
-        with (self.root / "log.json").open("w") as F:
-            json.dump(data, F, indent=2)
-
-    def set_thread_ident(self) -> None:
-        # ident = threading.get_ident()
-        ident = os.getpid()
-        self.ident = ident
-        with (self.root / "log.json").open() as F:
-            data = json.load(F)
-        data["ident"] = ident
         with (self.root / "log.json").open("w") as F:
             json.dump(data, F, indent=2)
 

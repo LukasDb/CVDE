@@ -43,8 +43,8 @@ def gui(port: int, root: Path) -> None:
     gui_file = Path(__file__).parent / "gui.py"
 
     streamlit_config = [
-        "--server.runOnSave",
-        "true",
+        # "--server.runOnSave",
+        # "true",
         "--server.port",
         str(port),
     ]

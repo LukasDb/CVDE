@@ -5,15 +5,17 @@ import pathlib
 import datetime
 import multiprocessing as mp
 import os
+from typing import Any
 import sys
 
 import cvde
 from cvde.workspace import Workspace as WS
+from .page import Page
 
 import tensorflow as tf
 
 
-class Launcher:
+class Launcher(Page):
     ace_options = {
         "language": "yaml",
         "show_gutter": False,
@@ -24,10 +26,13 @@ class Launcher:
     }
 
     def __init__(self) -> None:
-        self.configs = WS().list_configs()
-        self.configs.sort()
+        if "tags" not in st.session_state:
+            st.session_state.tags = set()
+        pass
 
     def run(self) -> None:
+        self.configs = WS().list_configs()
+        self.configs.sort()
         top_row = st.columns(5)
         bottom_row = st.columns(5)
 
@@ -48,6 +53,7 @@ class Launcher:
                 label="Tags",
                 text="Add tags...",
                 value=[],
+                suggestions=list(st.session_state.tags),
             )
 
         if len(run_name) == 0:
@@ -76,11 +82,6 @@ class Launcher:
                 F.write(new_config)
 
         if launch:
-            # WS().reload_modules()
-            # job_fn = cvde.ws_tools.load_job(job_name)
-            # job = job_fn(config_name=config_name, run_name=run_name, tags=tags)
-            # job.launch(env)
-            # self.launch(job_name, config_name, run_name, env)
             mp.Process(
                 # target=_run,
                 target=_run,
@@ -98,27 +99,31 @@ class Launcher:
                 f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'."
             )
 
+    def on_leave(self) -> None:
+        return super().on_leave()
+
 
 def _run(job_name: str, run_name: str, config_name: str, tags: list[str], env: dict) -> None:
     """in new Process"""
     for k, v in env.items():
         os.environ[k] = v
 
-    proc_name = mp.current_process().name
-
     job_fn = cvde.ws_tools.load_job(job_name)
     job = job_fn(config_name=config_name, run_name=run_name, tags=tags)
 
-    print(f"[{proc_name} ]FOUND DEVICES: {tf.config.list_physical_devices()}")
-    print(f"[{proc_name}] CUDA_VISIB: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    def handler(sig: int, frame: Any) -> None:
+        print("Terminated by user.")
+        job.on_terminate()
 
-    # assert isinstance(sys.stdout, cvde.ThreadPrinter)
-    # assert isinstance(sys.stderr, cvde.ThreadPrinter)
+    import signal
 
-    # with job.tracker.stdout_file.open("w") as std_file, job.tracker.stderr_file.open(
-    #     "w"
-    # ) as err_file:
-    #     sys.stdout.register_new_out(std_file)
-    #     sys.stderr.register_new_out(err_file)
+    signal.signal(signal.SIGTERM, handler)
 
-    # self.run(self.name, self.config, self.tracker)
+    assert isinstance(sys.stdout, cvde.ThreadPrinter)
+    assert isinstance(sys.stderr, cvde.ThreadPrinter)
+
+    # print sdtout, err to files as well
+    sys.stdout.register_new_out(job.tracker.stdout_file)
+    sys.stderr.register_new_out(job.tracker.stderr_file)
+
+    job.run()
