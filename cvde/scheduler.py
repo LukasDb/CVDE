@@ -91,7 +91,7 @@ class Scheduler:
     """schedule jobs"""
 
     def __init__(self) -> None:
-        self._current: dict[mp.Process, JobSubmission] = {}  # TODO threadsafe?
+        self._current: dict[mp.Process, JobSubmission] = {}
         self._lock_current = threading.Lock()
         self._executiongraph: DAG[JobSubmission] = DAG()
 
@@ -153,7 +153,7 @@ def _run(submission: JobSubmission) -> None:
 
     def handler(sig: int, frame: Any) -> None:
         print("Terminated by user.")
-        job.on_terminate()  # HACK
+        job.on_terminate()
         exit(0)
 
     signal.signal(signal.SIGTERM, handler)
@@ -165,10 +165,4 @@ def _run(submission: JobSubmission) -> None:
     sys.stdout.register_new_out(job.tracker.stdout_file)
     sys.stderr.register_new_out(job.tracker.stderr_file)
 
-    # job.run() # HACK
-
-    for _ in range(10):
-        time.sleep(1)
-        print("alive")
-
-    print("Finished")
+    job.run()
