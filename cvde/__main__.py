@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 import click
 from pathlib import Path
+import cvde
 
 
 @click.group()
@@ -13,25 +14,10 @@ def run() -> None:
 
 
 @run.command()
-@click.argument("name")
-def execute(name: str) -> None:
-    "Execute a given task"
-    raise NotImplementedError
-
-
-@run.command()
-@click.argument("type")
-@click.argument("name")
-def create(type: str, name: str) -> None:
-    "Create a new module of type {data|model|config|task}"
-    raise NotImplementedError
-
-
-@run.command()
 @click.option("-n", "--name", help="Name of the workspace")
 def init(name: str) -> None:
     "Create an empty workspace"
-    WS().init_workspace(name)
+    cvde.Workspace.init_workspace(name)
 
 
 @run.command()
@@ -62,7 +48,3 @@ def gui(port: int, root: Path) -> None:
         logging.warning("User interrupted.")
     finally:
         proc.kill()
-
-
-def summary() -> None:
-    print(WS().summary())

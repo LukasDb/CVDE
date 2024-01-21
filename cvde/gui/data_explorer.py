@@ -1,9 +1,6 @@
 import streamlit as st
-from typing import Any
-
 import cvde
 from .page import Page
-from cvde.workspace import Workspace as WS
 
 
 class DataExplorer(Page):
@@ -14,15 +11,15 @@ class DataExplorer(Page):
         if "data_index" not in st.session_state:
             st.session_state["data_index"] = 0
 
-        datasets: dict[str, type[cvde.tf.Dataset]] = WS().list_datasets()
-        configs = WS().list_configs()
+        datasets: dict[str, type[cvde.tf.Dataset]] = cvde.Workspace().list_datasets()
+        configs = cvde.Workspace().list_configs()
 
         # build data viewer
         col1, col2, col3 = st.columns(3)
         dataset_name = col1.selectbox(
             "Data source", list(datasets.keys()), on_change=self.clear_cache
         )
-        config_name = col2.selectbox("Config", configs, on_change=self.clear_cache)
+        config_name = col2.selectbox("Config", list(configs.keys()), on_change=self.clear_cache)
         if config_name is None:
             return
 
@@ -32,7 +29,7 @@ class DataExplorer(Page):
         buttons[1].button("Next", on_click=self.inc_data_index)
         buttons[2].button("Reset", on_click=self.clear_cache)
 
-        config = cvde.ws_tools.load_config(config_name)
+        config = configs[config_name]
         config = config.get(dataset_name, {})
 
         if dataset_name is None:
@@ -51,7 +48,8 @@ class DataExplorer(Page):
         dataset.visualize_example(data)
 
     def on_leave(self) -> None:
-        del st.session_state["loaded_dataset"]
+        if "loaded_dataset" in st.session_state:
+            del st.session_state["loaded_dataset"]
         return super().on_leave()
 
     def inc_data_index(self) -> None:

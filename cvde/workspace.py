@@ -1,4 +1,5 @@
 import json
+import yaml
 import importlib
 import os
 import shutil
@@ -10,10 +11,6 @@ import cvde
 import inspect
 
 
-class ModuleExistsError(Exception):
-    pass
-
-
 @st.cache_resource
 def persistent_stop_queue() -> set:
     return set()
@@ -21,13 +18,7 @@ def persistent_stop_queue() -> set:
 
 class Workspace:
     _instance: "Workspace|None" = None
-    FOLDERS = [
-        "models",
-        "datasets",
-        "jobs",
-        "losses",
-        "configs",
-    ]
+    FOLDERS = ["models", "datasets", "jobs", "losses", "configs", "log"]
 
     def __new__(cls) -> "Workspace":
         if cls._instance is None:
@@ -42,23 +33,20 @@ class Workspace:
                 f".workspace.cvde not found. Are you in a CVDE workspace? (Currently: {os.getcwd()})"
             )
 
-    def init_workspace(self, name: str) -> None:
+    @staticmethod
+    def init_workspace(name: str) -> None:
         logging.info("Creating empty workspace...")
         if len(os.listdir()) > 0:
             logging.error("Workspace is not empty!")
             exit(-1)
 
-        self.name: str = name
-        self.created: str = datetime.now().strftime("%Y-%m-%d")
-
-        state = {"name": self.name, "created": self.created}
+        created: str = datetime.now().strftime("%Y-%m-%d")
+        state = {"name": name, "created": created}
         with open(".workspace.cvde", "w") as F:
             json.dump(state, F, indent=4)
 
-        for folder in self.FOLDERS:
+        for folder in Workspace.FOLDERS:
             os.makedirs(folder)
-            with open(os.path.join(folder, "__init__.py"), "w") as F:
-                F.write("")
 
         # change/add .vscode launch config for debugging
         try:
@@ -117,19 +105,28 @@ class Workspace:
         self.name = state["name"]
         self.created = state["created"]
 
-    def list_jobs(self) -> list[str]:
+    def list_jobs(self) -> dict[str, type[cvde.job.Job]]:
         """find Names of cvde.job.Job subclasses in jobs/"""
-        jobs = []
+
+        def is_cvde_job(cls: type) -> bool:
+            return inspect.isclass(cls) and issubclass(cls, cvde.job.Job)
+
+        jobs: dict[str, type[cvde.job.Job]] = {}
         for file in pathlib.Path("jobs").iterdir():
             if file.is_file() and file.suffix == ".py" and file.stem != "__init__":
-                jobs.append(file.stem)
+                submodule = importlib.import_module(f"jobs.{file.stem}")
+                importlib.reload(submodule)
+                ds = inspect.getmembers(submodule, is_cvde_job)
+                jobs.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
         return jobs
 
-    def list_configs(self) -> list[str]:
-        configs = []
+    def list_configs(self) -> dict[str, dict]:
+        configs: dict[str, dict] = {}
         for file in pathlib.Path("configs").iterdir():
             if file.is_file() and file.suffix == ".yml":
-                configs.append(file.stem)
+                with file.open() as F:
+                    config: dict = yaml.load(F, Loader=yaml.Loader)
+                    configs[file.stem] = config
         return configs
 
     def list_datasets(self) -> dict[str, type[cvde.tf.Dataset]]:

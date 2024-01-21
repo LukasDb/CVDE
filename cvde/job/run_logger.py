@@ -13,6 +13,8 @@ import yaml
 from PIL import Image
 import numpy as np
 
+from cvde import job
+
 
 @dataclass
 class LogEntry:
@@ -45,7 +47,7 @@ class RunLogger:
         return tracker
 
     @staticmethod
-    def create(job_name: str, config_name: str, run_name: str) -> "RunLogger":
+    def create(job_name: str, config: dict[str, Any], run_name: str) -> "RunLogger":
         """creates folder structure for run"""
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
@@ -64,8 +66,9 @@ class RunLogger:
         stderr_file.touch()
 
         # COPY JOB CONFIG OVER
-        job_config_path = Path("configs") / (config_name + ".yml")
-        shutil.copy(job_config_path, root / "job.yml")
+        job_config_path = root / "job.yml"
+        with job_config_path.open("w") as F:
+            yaml.dump(config, F)
 
         started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         meta = {

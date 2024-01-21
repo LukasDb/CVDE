@@ -1,46 +1,37 @@
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 import streamlit_scrollable_textbox as stx  # type: ignore
-from streamlit_tags import st_tags  # type: ignore
+import itertools as it
 import os
 import yaml
 import numpy as np
 import plotly.graph_objects as go  # type: ignore
 import time
 
-from cvde.job.run_logger import RunLogger, LogEntry
+from cvde.job.run_logger import RunLogger
 from .page import Page
 
 
 class JobInspector(Page):
     def __init__(self) -> None:
-        if "tags" not in st.session_state:
-            st.session_state.tags = set()
+        pass
 
     def run(self) -> None:
         self.expanders: dict[str, DeltaGenerator] = {}
         self.expand_all = False
-        self.runs = os.listdir("log")
-        all_logs = [RunLogger.from_log(run) for run in self.runs]
+        runs = os.listdir("log")
+        all_logs = [RunLogger.from_log(run) for run in runs]
         all_logs.sort(key=lambda t: t.started, reverse=True)
-
-        tags = st.session_state.tags  # shorthand
-
-        for log in all_logs:
-            for tag in log.tags:
-                tags.add(tag)
 
         with st.sidebar:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
             self.log_axes = st.checkbox("Logarithmic", value=True)
             self.expand_all = st.checkbox("Expand all")
-            selected_tags = st.multiselect("Filter by tags", options=tags)
+            selected_tags = st.multiselect("Filter by tags", options=st.session_state.tags)
             cols = st.columns(2)
             cols[0].subheader("Logged runs", anchor=False)
-            all_selected = cols[1].checkbox(
-                "Select all", on_change=self.select_all, key="select_all"
-            )
+            all_selected = cols[1].checkbox("Select all")
 
         selected_logs: list[RunLogger] = []
         for log in all_logs:
@@ -48,9 +39,7 @@ class JobInspector(Page):
             if len(selected_tags) > 0 and not has_a_selected_tag:
                 continue
 
-            if st.sidebar.checkbox(
-                log.display_name, value=all_selected, key="select_" + log.folder_name
-            ):
+            if st.sidebar.checkbox(log.display_name, value=all_selected):
                 selected_logs.append(log)
 
         with st.sidebar:
@@ -74,20 +63,22 @@ class JobInspector(Page):
         # extract variable names
         var_names = np.unique([var_name for log in selected_logs for var_name in log.vars])
 
+        # show tags of run
+        available_colors = ["blue", "green", "orange", "red", "violet"]
+        color = {
+            tag: color for tag, color in zip(st.session_state.tags, it.cycle(available_colors))
+        }
+
         if len(selected_logs) > 0:
-            cols = st.columns(len(selected_logs))
-            for log, column in zip(selected_logs, cols):
-                with column:
-                    added_tags = st_tags(
-                        value=log.tags,
-                        label=f"{log.display_name}",
-                        suggestions=list(tags),
-                        key="tags_" + log.folder_name,
-                        text="Add tags...",
-                    )
-                    for tag in added_tags:
-                        tags.add(tag)
-                    log.set_tags(added_tags)
+            # build a grid of n columns for 3 rows
+            rows = [st.columns(len(selected_logs), gap="small") for i in range(3)]
+            for i, log in enumerate(selected_logs):
+                with rows[0][i]:
+                    st.subheader(log.name, anchor=False)
+                with rows[1][i]:
+                    st.caption("; ".join([f":{color[tag]}[{tag}]" for tag in log.tags]))
+                with rows[2][i]:
+                    st.caption(log.started)
 
         # display data
         # for each variable name, assemble plot of data
@@ -192,8 +183,3 @@ class JobInspector(Page):
                 self.expanders[var_name] = container
 
         return self.expanders[var_name]
-
-    def select_all(self) -> None:
-        for key in st.session_state.keys():
-            if isinstance(key, str) and key.startswith("select_"):
-                st.session_state[key] = st.session_state["select_all"]

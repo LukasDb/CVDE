@@ -31,7 +31,6 @@ from typing import Any
 
 
 # --- modules ---
-import cvde.workspace_tools as ws_tools
 import cvde.tf as tf
 import cvde.gui as gui
 import cvde.job as job
@@ -46,7 +45,6 @@ sys.stderr = ThreadPrinter(sys.stderr)
 
 __all__ = [
     "types",
-    "ws_tools",
     "Dataset",
     "gui",
     "job",
