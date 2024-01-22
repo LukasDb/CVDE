@@ -28,9 +28,17 @@ class GUI:
             all_logs = [cvde.job.RunLogger.from_log(run) for run in runs]
             all_logs.sort(key=lambda t: t.started, reverse=True)
             for log in all_logs:
-                print(f"adding tags from {log}: {log.tags}")
                 st.session_state.tags.update({t for t in log.tags})
 
+        if "selected_page" not in st.session_state:
+            st.session_state["selected_page"] = "Dashboard"
+
+        if not cvde.Workspace().git_tracking_enabled:
+            st.warning(
+                "Git tracking is disabled. Enable it by running `cvde init` in your Workspace directory. This will enable code tracking and repeatable experiments, more details can be found in the Readme of CVDE."
+            )
+
+        # build gui
         style_file = os.path.join(os.path.dirname(__file__), "style.css")
         with open(style_file) as F:
             style = F.read()
@@ -42,9 +50,6 @@ class GUI:
             "Launcher": cvde.gui.Launcher(),
             "Inspector": cvde.gui.JobInspector(),
         }
-
-        if "selected_page" not in st.session_state:
-            st.session_state["selected_page"] = "Dashboard"
 
         cols = st.columns(len(pages) + 1)
         cols[0].text("")

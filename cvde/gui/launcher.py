@@ -4,7 +4,6 @@ import pathlib
 import datetime
 import yaml
 import cvde
-from cvde.scheduler import Scheduler, JobSubmission
 from .page import Page
 
 
@@ -23,11 +22,12 @@ class Launcher(Page):
             st.session_state.last_submitted = None
 
     def run(self) -> None:
-        st.warning(
-            "Work in Progress: When you submit a job, the current configuration will be used when the job is launched. However, the current state of the code is not! At the time of the launch of the job (which is not necessarily the time you submit it), the code will be imported by Python."
-        )
+        if not cvde.Workspace().git_tracking_enabled:
+            st.warning(
+                "Git Tracking is not enabled! This means, the code at job submit time might be different from the code when the job is actually launched. Git Tracking saves a snapshot of your code at submission time and checks out to it when launching the job. To enable Git Tracking, run `cvde init` in your workspace directory."
+            )
         st.subheader("Job Queue")
-        scheduler: Scheduler = st.session_state["scheduler"]
+        scheduler: cvde.Scheduler = st.session_state["scheduler"]
         st.graphviz_chart(scheduler.get_digraph())
 
         self.configs = cvde.Workspace().list_configs()
@@ -116,7 +116,7 @@ class Launcher(Page):
         config = yaml.load(new_config_text, Loader=yaml.Loader)
 
         if submit:
-            submission = JobSubmission(
+            submission = cvde.job.JobSubmission(
                 config=config,
                 job_name=job_name,
                 run_name=run_name,

@@ -33,8 +33,9 @@ from typing import Any
 # --- modules ---
 import cvde.tf as tf
 import cvde.gui as gui
-import cvde.job as job
 from cvde.workspace import Workspace
+import cvde.job as job
+from cvde.scheduler import Scheduler
 import cvde.main_gui as main_gui
 from cvde.threaded_printer import ThreadPrinter
 
@@ -50,4 +51,7 @@ __all__ = [
     "gui",
     "job",
     "ThreadPrinter",
+    "Scheduler",
+    "Workspace",
+    "main_gui",
 ]

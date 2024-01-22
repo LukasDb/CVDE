@@ -2,13 +2,14 @@ import threading
 import graphviz
 import sys
 import os
-import cvde
+import subprocess
 import multiprocessing as mp
 import typing
 from typing import Any
-from dataclasses import dataclass
 import signal
-import time
+
+import cvde
+from cvde.job import JobSubmission
 
 T = typing.TypeVar("T")
 
@@ -75,18 +76,6 @@ class DAG(typing.Generic[T]):
         return leaves
 
 
-@dataclass
-class JobSubmission:
-    job_name: str
-    run_name: str
-    config: dict[str, Any]
-    tags: list[str]
-    env: dict[str, str]
-
-    def __hash__(self) -> int:
-        return hash(self.run_name)
-
-
 class Scheduler:
     """schedule jobs"""
 
@@ -148,8 +137,31 @@ def _run(submission: JobSubmission) -> None:
     for k, v in submission.env.items():
         os.environ[k] = v
 
+    logger = cvde.job.RunLogger.create(submission)
+
+    if cvde.Workspace().git_tracking_enabled:
+        subprocess.run(
+            ["git", "clone", ".", logger.workspace.resolve()], capture_output=True
+        ).check_returncode()
+
+        os.chdir(logger.workspace)
+        assert submission.commit is not None
+        assert submission.diff is not None
+
+        print("Checkout out to last commit at submission time.")
+        print(submission.commit)
+        subprocess.run(
+            ["git", "checkout", submission.commit], capture_output=True
+        ).check_returncode()
+        print("Applying uncommitted changes at submission time.")
+
+        subprocess.run(
+            ["git", "apply", logger.root.joinpath("uncommitted.diff").resolve()],
+            capture_output=True,
+        ).check_returncode()
+
     job_fn = cvde.Workspace().list_jobs()[submission.job_name]
-    job = job_fn(config=submission.config, run_name=submission.run_name, tags=submission.tags)
+    job = job_fn(logger=logger, config=submission.config)
 
     def handler(sig: int, frame: Any) -> None:
         print("Terminated by user.")
@@ -165,4 +177,21 @@ def _run(submission: JobSubmission) -> None:
     sys.stdout.register_new_out(job.tracker.stdout_file)
     sys.stderr.register_new_out(job.tracker.stderr_file)
 
-    job.run()
+    # job.run()
+    import time
+
+    for _ in range(10):
+        time.sleep(1)
+        print("alive")
+    print("done")
+
+
+# def on_launch() -> None:
+#     # clone repo into /tmp/<run_name>
+#     os.system("git clone . /tmp/<run_name>")
+
+#     # IN THE TEMPORAY DIRECTORY
+#     # checkout commit hash
+#     os.system("git checkout $(cat commit_hash.txt)")
+#     # apply diff
+#     os.system("git apply output_file.txt")

@@ -35,7 +35,13 @@ This project aims to provide a framework for Computer Vision experiments. The fr
 - To log data during your job, use `self.logger.log(name: str, value, index: int)`. The data can then be inspected in the GUI->Inspector.
 - Currently scalars, and images are supported. CVDE will try to automatically detect the type of the data you are logging, using the shape. For images, use the shape `[H, W, C]` or `[H, W]` for grayscale images.
 - The index in `self.logger.log` is used to assign an order to the logged data. E.g. if you log the loss after each training epoch, then you should assign the epoch number as index. This will be used to plot the loss over time in the GUI->Inspector.
+- If you want to save weights (or maybe other data) it is highly recommended to use the paths of `self.logger.weights_root` or generic `self.logger.root` referreing to the folder in log/ where the data will be saved. This way the data will be automatically saved in the correct folder.
 
 **Configs**
 - For now yaml files are used to keep the configuration. You can use the GUI to edit the config files.
 
+**Git Tracking**
+- Inspired by [Dr. Watson](https://juliadynamics.github.io/DrWatson.jl/dev/) for Julia, CVDE uses Git to store the state of your code when you run an experiment. This way you can always go back to the exact code that was used to run an experiment.
+- Git tracking will be enabled when you initialize a CVDE Workspace
+- To enable Git Tracking on a previously un-initialized CVDE Workspace run `cvde init` again in the the root directory of your workspace and follow the instructions.
+- If Git Tracking is enabled, every time you submit a job the current state of your code will be captured by saving the current commit hash and the diff of the current state with the last commit. This will be saved in the log folder of the job. in the log_folder/workspace, a cloned copy of your repository will be used to execute your job. This way you can always go back to the exact code that was used to run an experiment.

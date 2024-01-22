@@ -13,7 +13,8 @@ import yaml
 from PIL import Image
 import numpy as np
 
-from cvde import job
+import cvde
+from .job_submission import JobSubmission
 
 
 @dataclass
@@ -35,9 +36,10 @@ class RunLogger:
         self.started = meta["started"]
         self.tags = meta["tags"]
         self.pid = int(meta.get("pid", -1))
-        self.root = Path("log/" + self.folder_name)
+        self.root = Path("log/" + self.folder_name).resolve()
         self.var_root = self.root / "vars"
         self.weights_root = self.root / "weights"
+        self.workspace = self.root / "workspace"
         self.stdout_file = self.root / "stdout.txt"
         self.stderr_file = self.root / "stderr.txt"
 
@@ -47,33 +49,48 @@ class RunLogger:
         return tracker
 
     @staticmethod
-    def create(job_name: str, config: dict[str, Any], run_name: str) -> "RunLogger":
+    def create(submission: JobSubmission) -> "RunLogger":
         """creates folder structure for run"""
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
         unique_hash = hash(now) + sys.maxsize + 1
-        folder_name = run_name + "_" + str(unique_hash)
+        folder_name = submission.run_name + "_" + str(unique_hash)
         root = Path("log/" + folder_name)
 
+        # create subfolders
         var_root = root / "vars"
-        var_root.mkdir(parents=True, exist_ok=True)
         weights_root = root / "weights"
+        workspace = root / "workspace"
+        var_root.mkdir(parents=True, exist_ok=True)
         weights_root.mkdir(parents=True, exist_ok=True)
+        workspace.mkdir(parents=True, exist_ok=True)
 
+        # create empty stdout, stderr files
         stdout_file = root / "stdout.txt"
         stderr_file = root / "stderr.txt"
         stdout_file.touch()
         stderr_file.touch()
 
-        # COPY JOB CONFIG OVER
+        # save commit hash and diff
+        if cvde.Workspace().git_tracking_enabled:
+            assert submission.commit is not None
+            with (root / "commit.txt").open("w") as F:
+                F.write(submission.commit)
+
+            assert submission.diff is not None
+            with (root / "uncommitted.diff").open("w") as F:
+                F.write(submission.diff)
+
+        # copy job config; to preserve comments, dont dump yaml
         job_config_path = root / "job.yml"
         with job_config_path.open("w") as F:
-            yaml.dump(config, F)
+            yaml.dump(submission.config, F)
 
+        # create meta
         started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         meta = {
-            "job": job_name,
-            "name": run_name,
+            "job": submission.job_name,
+            "name": submission.run_name,
             "started": started,
             "pid": str(mp.current_process().pid),
             "tags": [],

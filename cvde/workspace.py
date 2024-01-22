@@ -1,4 +1,5 @@
 import json
+import subprocess
 import yaml
 import importlib
 import os
@@ -19,6 +20,18 @@ def persistent_stop_queue() -> set:
 class Workspace:
     _instance: "Workspace|None" = None
     FOLDERS = ["models", "datasets", "jobs", "losses", "configs", "log"]
+    meta_file = pathlib.Path(".workspace.cvde")
+    default_git_ignore = [
+        "**/__pycache__",
+        "*.pt",
+        "*.pyc",
+        "__pycache__/",
+        ".vscode/**",
+        ".mypy_cache/**",
+        "*.so",
+        "*.o",
+        "log/",
+    ]
 
     def __new__(cls) -> "Workspace":
         if cls._instance is None:
@@ -27,27 +40,48 @@ class Workspace:
 
     def __init__(self) -> None:
         try:
-            self._read_state()
+            with self.meta_file.open("r") as F:
+                state = json.load(F)
         except FileNotFoundError:
             raise FileNotFoundError(
                 f".workspace.cvde not found. Are you in a CVDE workspace? (Currently: {os.getcwd()})"
             )
 
+        self.name = state["name"]
+        self.created = state["created"]
+        self.git_tracking_enabled = state.get("git_tracking_enabled", False)
+
     @staticmethod
     def init_workspace(name: str) -> None:
-        logging.info("Creating empty workspace...")
+        if Workspace.meta_file.exists():
+            print(f"Found existing CVDE workspace ({Workspace().name}).")
+            if not Workspace().git_tracking_enabled:
+                print("Git tracking is disabled.")
+                Workspace().enable_git_tracking()
+                exit(0)
+            else:
+                print("Found existing CVDE workspace")
+                exit(-1)
+
+        logging.info("Creating CVDE workspace...")
         if len(os.listdir()) > 0:
-            logging.error("Workspace is not empty!")
+            logging.error("Directory is not empty!")
             exit(-1)
 
         created: str = datetime.now().strftime("%Y-%m-%d")
-        state = {"name": name, "created": created}
-        with open(".workspace.cvde", "w") as F:
+        state = {"name": name, "created": created, "git_tracking_enabled": False}
+        with Workspace.meta_file.open("w") as F:
             json.dump(state, F, indent=4)
 
         for folder in Workspace.FOLDERS:
             os.makedirs(folder)
 
+        # TODO generate .gitignore
+
+        Workspace().create_debug_configs()
+        Workspace().enable_git_tracking()
+
+    def create_debug_configs(self) -> None:
         # change/add .vscode launch config for debugging
         try:
             with pathlib.Path(".vscode/launch.json").open() as F:
@@ -66,10 +100,9 @@ class Workspace:
                 add_pytest = False
             if config["name"] == "Python: CVDE GUI":
                 add_gui_debug = False
-
         pytest_path = shutil.which("pytest")
         streamlit_path = shutil.which("streamlit")
-        cvde_gui_path = pathlib.Path(__file__).parent / "gui.py"
+        cvde_gui_path = pathlib.Path(cvde.main_gui.__file__).resolve()
 
         if add_pytest and pytest_path is not None:
             launch_config["configurations"].append(
@@ -94,16 +127,49 @@ class Workspace:
                     "justMyCode": True,
                 }
             )
-
         pathlib.Path(".vscode/").mkdir(exist_ok=True)
         with pathlib.Path(".vscode/launch.json").open("w") as F:
             json.dump(launch_config, F, indent=4)
 
-    def _read_state(self) -> None:
-        with open(".workspace.cvde") as F:
-            state = json.load(F)
-        self.name = state["name"]
-        self.created = state["created"]
+    def enable_git_tracking(self) -> None:
+        if input("Enable git tracking? (y/n): ").lower() != "y":
+            return
+
+        # check if git is installed
+        if shutil.which("git") is None:
+            logging.error("Git is not installed! Please install git and run 'cvde init' again.")
+            exit(-1)
+
+        # check if gitignore exists
+        if not pathlib.Path(".gitignore").exists():
+            print("Creating .gitignore...")
+            with pathlib.Path(".gitignore").open("w") as F:
+                F.write("\n".join(Workspace.default_git_ignore))
+        else:
+            print("Found existing .gitignore, appending CVDE defaults...")
+            with open(".gitignore") as F:
+                ignored = F.read().split("\n")
+            for to_add in filter(lambda x: x not in ignored, Workspace.default_git_ignore):
+                ignored.append(to_add)
+            with open(".gitignore", "w") as F:
+                F.write("\n".join(ignored))
+
+        print("CVDE will create a branch called 'experiments' and commit your runs there.")
+        new_repo = False
+        # check if current repo exists
+        if not pathlib.Path(".git").exists():
+            print("Creating new git repository...")
+            subprocess.run(["git", "init"])
+            new_repo = True
+
+        state = {"name": self.name, "created": self.created, "git_tracking_enabled": True}
+        with Workspace.meta_file.open("w") as F:
+            json.dump(state, F, indent=4)
+
+        if new_repo:
+            # only add changes if repo is new
+            subprocess.run(["git", "add", "--all"])
+            subprocess.run(["git", "commit", "-m", "initial commit"])
 
     def list_jobs(self) -> dict[str, type[cvde.job.Job]]:
         """find Names of cvde.job.Job subclasses in jobs/"""

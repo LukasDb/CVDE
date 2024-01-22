@@ -1,16 +1,14 @@
 from abc import ABC, abstractmethod
 import sys
 from typing import Any
-
 from .run_logger import RunLogger
 
 
 class Job(ABC):
-    def __init__(self, *, run_name: str, config: dict[str, Any], tags: list[str] = []) -> None:
+    def __init__(self, *, logger: RunLogger, config: dict[str, Any]) -> None:
         self.name = self.__class__.__name__
         self.config = config
-        self.logger = RunLogger.create(self.name, config, run_name=run_name)
-        self.logger.set_tags(tags)
+        self.logger = logger
 
     @property
     def tracker(self) -> RunLogger:
