@@ -26,13 +26,14 @@ def init(name: str) -> None:
 def gui(port: int, root: Path) -> None:
     "Run CVDE GUI in your browser"
 
-    gui_file = Path(__file__).parent / "gui.py"
+    # gui_file = Path(__file__).parent / "main_gui.py"
+    gui_file = Path(cvde.main_gui.__file__).resolve()
 
     streamlit_config = [
-        # "--server.runOnSave",
-        # "true",
         "--server.port",
         str(port),
+        "--server.headless",
+        "true",
     ]
 
     proc = subprocess.Popen(

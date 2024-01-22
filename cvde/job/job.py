@@ -21,6 +21,5 @@ class Job(ABC):
     def run(self) -> None:
         pass
 
-    @abstractmethod
     def on_terminate(self) -> None:
         pass

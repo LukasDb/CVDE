@@ -9,7 +9,7 @@ This project aims to provide a framework for Computer Vision experiments. The fr
 ## Getting Started
 - clone this repository in run `pip install .` in the root directory
 - run `cvde init` to create the project structure in an empty folder
-- run `cvde gui` to access the GUI from your browser
+- run `cvde gui [path/to/workspace]` to access the GUI from your browser
 - `cvde --help` for more information
 - `cvde init` will also attempt to create a `.vscode/launch.json` to be used with Visual Studio Code for debugging.
 
@@ -25,16 +25,16 @@ This project aims to provide a framework for Computer Vision experiments. The fr
 
 **Datasets**
 - Datasets should inherit from `cvde.tf.Dataset`. Implement `__init__`, `__getitem__`, `__len__` and `visualize_example` methods.
-- `__getitem__` should return a dict that contains tensors or np.arrays, then you can use `.from_cache()` and `.cache()` to load your dataset into a sharded tfrecord dataset for better performance.
-- In `visualize_example` use functions from [streamlit](https://streamlit.io) to visualize one example of your datase, as returned by `__getitem__`. This will be used in the Data explorer of the GUI
+- `__getitem__` should return a dict that contains tensors or np.arrays, then you can use `.from_cache()` and `.cache()` to load your dataset into a sharded tfrecord dataset for better performance. Not necessary if you use high-performance dataloaders from 6IMPOSE_Data.
+- In `visualize_example` use functions from [streamlit](https://streamlit.io) to visualize one example of your dataset, as returned by `__getitem__`. This will be used in the Data explorer of the GUI
+- Since `__getitem__` most likely outputs a non-batched example (for visualization), perform batching in your training job.
 
 **Jobs**
-- To create a job, create a new file in `jobs/`, inherit from `cvde.job.Job` and implement `__init__` and `run` methods.
+- To create a job, create a new file in `jobs/`, inherit from `cvde.job.Job` and implement `__init__`, `run` and `on_terminate` methods.
 - You can access the parameters of your Config file using `self.config: Dict[str, Any]`
-- During your job, you should use `self.is_stopped()-> bool` to check if the job was stopped by the user. Otherwise the job can not be terminated from the GUI.
-- To log data during your job, use `self.tracker.log(name: str, value, index: int)`. The data can then be inspected in the GUI->Inspector.
+- To log data during your job, use `self.logger.log(name: str, value, index: int)`. The data can then be inspected in the GUI->Inspector.
 - Currently scalars, and images are supported. CVDE will try to automatically detect the type of the data you are logging, using the shape. For images, use the shape `[H, W, C]` or `[H, W]` for grayscale images.
-- The index in `self.tracker.log` is used to assign an order to the logged data. E.g. if you log the loss after each training epoch, then you should assign the epoch number as index. This will be used to plot the loss over time in the GUI->Inspector.
+- The index in `self.logger.log` is used to assign an order to the logged data. E.g. if you log the loss after each training epoch, then you should assign the epoch number as index. This will be used to plot the loss over time in the GUI->Inspector.
 
 **Configs**
 - For now yaml files are used to keep the configuration. You can use the GUI to edit the config files.

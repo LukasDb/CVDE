@@ -4,7 +4,6 @@ import os
 import streamlit as st
 from datetime import datetime
 import cvde
-from gui.page import Page
 import requests
 
 from cvde.scheduler import Scheduler
@@ -37,7 +36,7 @@ class GUI:
             style = F.read()
         st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
 
-        pages: dict[str, Page] = {
+        pages: dict[str, cvde.gui.Page] = {
             "Dashboard": cvde.gui.Dashboard(),
             "Data": cvde.gui.DataExplorer(),
             "Launcher": cvde.gui.Launcher(),

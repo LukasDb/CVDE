@@ -161,7 +161,7 @@ def _run(submission: JobSubmission) -> None:
     assert isinstance(sys.stdout, cvde.ThreadPrinter)
     assert isinstance(sys.stderr, cvde.ThreadPrinter)
 
-    # print sdtout, err to files as well
+    # print stdout, err to files as well
     sys.stdout.register_new_out(job.tracker.stdout_file)
     sys.stderr.register_new_out(job.tracker.stderr_file)
 

@@ -35,6 +35,7 @@ import cvde.tf as tf
 import cvde.gui as gui
 import cvde.job as job
 from cvde.workspace import Workspace
+import cvde.main_gui as main_gui
 from cvde.threaded_printer import ThreadPrinter
 
 # --- colored printing for different processes ---
