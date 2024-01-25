@@ -18,7 +18,7 @@ class JobSubmission:
         if not cvde.Workspace().git_tracking_enabled:
             return
 
-        subprocess.run(["git", "add", "-A"])
+        subprocess.run(["git", "add", "-A"], capture_output=True)
         self.diff = subprocess.run(["git", "diff", "HEAD"], capture_output=True).stdout.decode()
         subprocess.run(["git", "reset", "HEAD"])
 

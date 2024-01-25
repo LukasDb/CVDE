@@ -93,7 +93,7 @@ class RunLogger:
             "name": submission.run_name,
             "started": started,
             "pid": str(mp.current_process().pid),
-            "tags": [],
+            "tags": submission.tags,
         }
 
         with (root / "log.json").open("w") as F:

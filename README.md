@@ -36,6 +36,7 @@ This project aims to provide a framework for Computer Vision experiments. The fr
 - Currently scalars, and images are supported. CVDE will try to automatically detect the type of the data you are logging, using the shape. For images, use the shape `[H, W, C]` or `[H, W]` for grayscale images.
 - The index in `self.logger.log` is used to assign an order to the logged data. E.g. if you log the loss after each training epoch, then you should assign the epoch number as index. This will be used to plot the loss over time in the GUI->Inspector.
 - If you want to save weights (or maybe other data) it is highly recommended to use the paths of `self.logger.weights_root` or generic `self.logger.root` referreing to the folder in log/ where the data will be saved. This way the data will be automatically saved in the correct folder.
+- Your job should then be available in the Job Launcher of the GUI. Choose your job and your configuration. Set environment variables (like GPUs) and specify if this job should wait for other scheduled jobs. You can then schedule multiple jobs to run in parallel or sequentially according to your constraints. Note: When your job is scheduled, the current state of your code and your configuration will be used for launching the job. This is based on git commits and diffs, therefore gitignored files are not taken into account!
 
 **Configs**
 - For now yaml files are used to keep the configuration. You can use the GUI to edit the config files.

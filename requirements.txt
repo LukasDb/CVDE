@@ -12,3 +12,4 @@ plotly
 colorama
 tqdm
 psutil
+graphviz

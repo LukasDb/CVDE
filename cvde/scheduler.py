@@ -124,7 +124,6 @@ class Scheduler:
             process = mp.Process(
                 target=_run,
                 args=(submission,),
-                daemon=True,
             )
 
             process.start()
@@ -177,21 +176,10 @@ def _run(submission: JobSubmission) -> None:
     sys.stdout.register_new_out(job.tracker.stdout_file)
     sys.stderr.register_new_out(job.tracker.stderr_file)
 
-    # job.run()
-    import time
+    job.run()
+    # import time
 
-    for _ in range(10):
-        time.sleep(1)
-        print("alive")
-    print("done")
-
-
-# def on_launch() -> None:
-#     # clone repo into /tmp/<run_name>
-#     os.system("git clone . /tmp/<run_name>")
-
-#     # IN THE TEMPORAY DIRECTORY
-#     # checkout commit hash
-#     os.system("git checkout $(cat commit_hash.txt)")
-#     # apply diff
-#     os.system("git apply output_file.txt")
+    # for _ in range(10):
+    #     time.sleep(1)
+    #     print("alive")
+    # print("done")

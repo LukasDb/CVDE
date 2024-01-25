@@ -2,11 +2,11 @@ import colorama
 import re
 import threading
 from pathlib import Path
-from typing import TextIO
+from typing import Iterator, TextIO, Any, Iterable
 import multiprocessing as mp
 
 
-class ThreadPrinter:
+class ThreadPrinter(TextIO):
     """multiprocessing printer in different colors, with optional file output"""
 
     COLORS = [
@@ -28,7 +28,7 @@ class ThreadPrinter:
     def register_new_out(self, file_path: Path) -> None:
         self.file_paths[mp.current_process().name] = file_path
 
-    def write(self, value: str) -> None:
+    def write(self, value: str) -> int:
         result = re.search("[0-9]+", mp.current_process().name)
         chosen_index = 0 if result is None else int(result.group())
         chosen_color = self.COLORS[chosen_index % len(self.COLORS)]
@@ -42,6 +42,7 @@ class ThreadPrinter:
             file_path = self.file_paths[mp.current_process().name]
             with file_path.open("a") as F:
                 F.write(value)
+        return 1
 
     def __eq__(self, other: object) -> bool:
         assert hasattr(self, "stream")
@@ -49,6 +50,58 @@ class ThreadPrinter:
 
     def flush(self) -> None:
         self.stream.flush()
+
+    def __enter__(self) -> "ThreadPrinter":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+        self.stream.__exit__(exc_type, exc_value, traceback)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.stream)
+
+    def __next__(self) -> str:
+        return next(self.stream)
+
+    def close(self) -> None:
+        self.stream.close()
+
+    def fileno(self) -> int:
+        return self.stream.fileno()
+
+    def isatty(self) -> bool:
+        return self.stream.isatty()
+
+    def read(self, __n: int = -1) -> str:
+        return super().read(__n)
+
+    def readable(self) -> bool:
+        return self.stream.readable()
+
+    def readline(self, limit: int = -1) -> str:
+        return self.stream.readline(limit)
+
+    def readlines(self, hint: int = -1) -> list[str]:
+        return self.stream.readlines(hint)
+
+    def seek(self, __offset: int, __whence: int = -1) -> int:
+        return super().seek(__offset, __whence)
+
+    def seekable(self) -> bool:
+        return self.stream.seekable()
+
+    def tell(self) -> int:
+        return super().tell()
+
+    def truncate(self, __size: int | None = None) -> int:
+        return super().truncate(__size)
+
+    def writable(self) -> bool:
+        return self.stream.writable()
+
+    def writelines(self, __lines: Iterable[str]) -> None:
+        for line in __lines:
+            self.write(line + "\n")
 
 
 class __ThreadPrinter:

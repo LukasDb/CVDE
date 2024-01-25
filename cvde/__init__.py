@@ -40,6 +40,7 @@ import cvde.main_gui as main_gui
 from cvde.threaded_printer import ThreadPrinter
 
 # --- colored printing for different processes ---
+# this can cause problems with libraries do similar stuff with sys.stdout
 import sys
 
 sys.stdout = ThreadPrinter(sys.stdout)
