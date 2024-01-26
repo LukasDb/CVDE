@@ -113,7 +113,11 @@ class Launcher(Page):
             with config_path.open("w") as F:
                 F.write(new_config_text)
 
-        config = yaml.load(new_config_text, Loader=yaml.Loader)
+        try:
+            config = yaml.load(new_config_text, Loader=yaml.Loader)
+        except Exception as e:
+            st.error("Error parsing config file.")
+            return
 
         if submit:
             submission = cvde.job.JobSubmission(

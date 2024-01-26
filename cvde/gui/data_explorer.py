@@ -30,6 +30,7 @@ class DataExplorer(Page):
         buttons[2].button("Reset", on_click=self.clear_cache)
 
         config = configs[config_name]
+        assert config is not None, f"Error parsing {config_name}"
         config = config.get(dataset_name, {})
 
         if dataset_name is None:
