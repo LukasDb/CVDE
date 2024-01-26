@@ -173,13 +173,7 @@ def _run(submission: JobSubmission) -> None:
     assert isinstance(sys.stderr, cvde.ThreadPrinter)
 
     # print stdout, err to files as well
-    sys.stdout.register_new_out(job.tracker.stdout_file)
-    sys.stderr.register_new_out(job.tracker.stderr_file)
+    sys.stdout.register_new_out(job.logger.stdout_file)
+    sys.stderr.register_new_out(job.logger.stderr_file)
 
     job.run()
-    # import time
-
-    # for _ in range(10):
-    #     time.sleep(1)
-    #     print("alive")
-    # print("done")
