@@ -186,15 +186,16 @@ class Workspace:
                 jobs.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
         return jobs
 
-    def list_configs(self) -> dict[str, dict|None]:
-        configs: dict[str, dict|None] = {}
+    def list_configs(self) -> dict[str, dict | None]:
+        configs: dict[str, dict | None] = {}
         for file in pathlib.Path("configs").iterdir():
             if file.is_file() and file.suffix == ".yml":
                 with file.open() as F:
                     try:
-                        config: dict = yaml.load(F, Loader=yaml.Loader)
+                        config: dict|None = yaml.load(F, Loader=yaml.Loader)
                     except Exception:
-                        configs[file.stem] = None
+                        config = None
+
                     configs[file.stem] = config
         return configs
 
