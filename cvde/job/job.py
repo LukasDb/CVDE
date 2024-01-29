@@ -21,3 +21,10 @@ class Job(ABC):
 
     def on_terminate(self) -> None:
         pass
+
+    def is_stopped(self) -> bool:
+        print(
+            "WARNING: job.is_stopped() is deprecated. Please remove it from your code.",
+            file=sys.stderr,
+        )
+        return False
