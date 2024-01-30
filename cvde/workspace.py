@@ -1,19 +1,15 @@
 import json
+import subprocess
+import yaml
+import importlib
 import os
 import shutil
 import logging
-import importlib
 from datetime import datetime
 import pathlib
-import inspect
-import tensorflow as tf
-import sys
 import streamlit as st
 import cvde
-
-
-class ModuleExistsError(Exception):
-    pass
+import inspect
 
 
 @st.cache_resource
@@ -23,49 +19,69 @@ def persistent_stop_queue() -> set:
 
 class Workspace:
     _instance: "Workspace|None" = None
-    FOLDERS = [
-        "models",
-        "datasets",
-        "jobs",
-        "losses",
-        "configs",
+    FOLDERS = ["models", "datasets", "jobs", "losses", "configs", "log"]
+    meta_file = pathlib.Path(".workspace.cvde")
+    default_git_ignore = [
+        "**/__pycache__",
+        "*.pt",
+        "*.pyc",
+        "__pycache__/",
+        ".vscode/**",
+        ".mypy_cache/**",
+        "*.so",
+        "*.o",
+        "log/",
     ]
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls) -> "Workspace":
         if cls._instance is None:
-            cls._instance = super(Workspace, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(Workspace, cls).__new__(cls)
         return cls._instance
 
     def __init__(self) -> None:
         try:
-            self._read_state()
+            with self.meta_file.open("r") as F:
+                state = json.load(F)
         except FileNotFoundError:
             raise FileNotFoundError(
                 f".workspace.cvde not found. Are you in a CVDE workspace? (Currently: {os.getcwd()})"
             )
 
-    @property
-    def stop_queue(self):
-        return persistent_stop_queue()
+        self.name = state["name"]
+        self.created = state["created"]
+        self.git_tracking_enabled = state.get("git_tracking_enabled", False)
 
-    def init_workspace(self, name: str) -> None:
-        logging.info("Creating empty workspace...")
+    @staticmethod
+    def init_workspace(name: str) -> None:
+        if Workspace.meta_file.exists():
+            print(f"Found existing CVDE workspace ({Workspace().name}).")
+            if not Workspace().git_tracking_enabled:
+                print("Git tracking is disabled.")
+                Workspace().enable_git_tracking()
+                exit(0)
+            else:
+                print("Found existing CVDE workspace")
+                exit(-1)
+
+        logging.info("Creating CVDE workspace...")
         if len(os.listdir()) > 0:
-            logging.error("Workspace is not empty!")
+            logging.error("Directory is not empty!")
             exit(-1)
 
-        self.name: str = name
-        self.created: str = datetime.now().strftime("%Y-%m-%d")
-
-        state = {"name": self.name, "created": self.created}
-        with open(".workspace.cvde", "w") as F:
+        created: str = datetime.now().strftime("%Y-%m-%d")
+        state = {"name": name, "created": created, "git_tracking_enabled": False}
+        with Workspace.meta_file.open("w") as F:
             json.dump(state, F, indent=4)
 
-        for folder in self.FOLDERS:
+        for folder in Workspace.FOLDERS:
             os.makedirs(folder)
-            with open(os.path.join(folder, "__init__.py"), "w") as F:
-                F.write("")
 
+        # TODO generate .gitignore
+
+        Workspace().create_debug_configs()
+        Workspace().enable_git_tracking()
+
+    def create_debug_configs(self) -> None:
         # change/add .vscode launch config for debugging
         try:
             with pathlib.Path(".vscode/launch.json").open() as F:
@@ -84,10 +100,9 @@ class Workspace:
                 add_pytest = False
             if config["name"] == "Python: CVDE GUI":
                 add_gui_debug = False
-
         pytest_path = shutil.which("pytest")
         streamlit_path = shutil.which("streamlit")
-        cvde_gui_path = pathlib.Path(__file__).parent / "gui.py"
+        cvde_gui_path = pathlib.Path(cvde.main_gui.__file__).resolve()
 
         if add_pytest and pytest_path is not None:
             launch_config["configurations"].append(
@@ -112,86 +127,87 @@ class Workspace:
                     "justMyCode": True,
                 }
             )
-
         pathlib.Path(".vscode/").mkdir(exist_ok=True)
         with pathlib.Path(".vscode/launch.json").open("w") as F:
             json.dump(launch_config, F, indent=4)
 
-    def _read_state(self) -> None:
-        with open(".workspace.cvde") as F:
-            state = json.load(F)
-        self.name = state["name"]
-        self.created = state["created"]
+    def enable_git_tracking(self) -> None:
+        if input("Enable git tracking? (y/n): ").lower() != "y":
+            return
 
-    @property
-    def datasets(self) -> list[type[cvde.tf.Dataset]]:
-        return cvde.ws_tools.list_modules(
-            "datasets", lambda v: inspect.isclass(v) and issubclass(v, cvde.tf.Dataset)
-        )
+        # check if git is installed
+        if shutil.which("git") is None:
+            logging.error("Git is not installed! Please install git and run 'cvde init' again.")
+            exit(-1)
 
-    @property
-    def models(self):
-        return cvde.ws_tools.list_modules(
-            "models", lambda v: inspect.isclass(v) and issubclass(v, tf.keras.Model)
-        )
+        # check if gitignore exists
+        if not pathlib.Path(".gitignore").exists():
+            print("Creating .gitignore...")
+            with pathlib.Path(".gitignore").open("w") as F:
+                F.write("\n".join(Workspace.default_git_ignore))
+        else:
+            print("Found existing .gitignore, appending CVDE defaults...")
+            with open(".gitignore") as F:
+                ignored = F.read().split("\n")
+            for to_add in filter(lambda x: x not in ignored, Workspace.default_git_ignore):
+                ignored.append(to_add)
+            with open(".gitignore", "w") as F:
+                F.write("\n".join(ignored))
 
-    @property
-    def configs(self):
-        dir = "configs"
-        configs = list(x.stem for x in pathlib.Path(dir).glob("*.yml"))
+        print("CVDE will create a branch called 'experiments' and commit your runs there.")
+        new_repo = False
+        # check if current repo exists
+        if not pathlib.Path(".git").exists():
+            print("Creating new git repository...")
+            subprocess.run(["git", "init"])
+            new_repo = True
+
+        state = {"name": self.name, "created": self.created, "git_tracking_enabled": True}
+        with Workspace.meta_file.open("w") as F:
+            json.dump(state, F, indent=4)
+
+        if new_repo:
+            # only add changes if repo is new
+            subprocess.run(["git", "add", "--all"])
+            subprocess.run(["git", "commit", "-m", "initial commit"])
+
+    def list_jobs(self) -> dict[str, type[cvde.job.Job]]:
+        """find Names of cvde.job.Job subclasses in jobs/"""
+
+        def is_cvde_job(cls: type) -> bool:
+            return inspect.isclass(cls) and issubclass(cls, cvde.job.Job)
+
+        jobs: dict[str, type[cvde.job.Job]] = {}
+        for file in pathlib.Path("jobs").iterdir():
+            if file.is_file() and file.suffix == ".py" and file.stem != "__init__":
+                submodule = importlib.import_module(f"jobs.{file.stem}")
+                importlib.reload(submodule)
+                ds = inspect.getmembers(submodule, is_cvde_job)
+                jobs.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
+        return jobs
+
+    def list_configs(self) -> dict[str, dict | None]:
+        configs: dict[str, dict | None] = {}
+        for file in pathlib.Path("configs").iterdir():
+            if file.is_file() and file.suffix == ".yml":
+                with file.open() as F:
+                    try:
+                        config: dict|None = yaml.load(F, Loader=yaml.Loader)
+                    except Exception:
+                        config = None
+
+                    configs[file.stem] = config
         return configs
 
-    @property
-    def jobs(self):
-        return cvde.ws_tools.list_modules(
-            "jobs", lambda v: inspect.isclass(v) and issubclass(v, cvde.job.Job)
-        )
+    def list_datasets(self) -> dict[str, type[cvde.tf.Dataset]]:
+        def is_cvde_dataset(cls: type) -> bool:
+            return inspect.isclass(cls) and issubclass(cls, cvde.tf.Dataset)
 
-    @property
-    def losses(self):
-        return cvde.ws_tools.list_modules(
-            "losses",
-            lambda v: (inspect.isclass(v) and issubclass(v, tf.keras.losses.Loss))
-            or hasattr(v, "__call__"),
-        )
-
-    def summary(self) -> str:
-        # print summary of workspace
-        out = ""
-        out += "-- Workspace summary --\n"
-        out += "Created: " + self.created + "\n"
-
-        def print_entries(type):
-            entries = ""
-            for m in self.__getattribute__(type):
-                if hasattr(m, "__name__"):
-                    name = m.__name__
-                else:
-                    name = m
-                entries += f"├───{name}\n"
-            return entries
-
-        out += "\nJobs:\n"
-        out += print_entries("jobs")
-
-        out += "\nConfigs:\n"
-        out += print_entries("configs")
-
-        out += "\nDataloaders:\n"
-        out += print_entries("datasets")
-
-        out += "\nModels:\n"
-        out += print_entries("models")
-
-        out += "\nLosses:\n"
-        out += print_entries("losses")
-
-        return out
-
-    def reload_modules(self):
-        # reload all modules in Workspace
-        loaded = sys.modules.copy()
-        for mod in loaded:
-            for folder in self.FOLDERS:
-                if mod.startswith(folder) or mod == folder:
-                    importlib.reload(sys.modules[mod])
+        datasets: dict[str, type[cvde.tf.Dataset]] = {}
+        for file in pathlib.Path("datasets").iterdir():
+            if file.is_file() and file.suffix == ".py" and file.stem != "__init__":
+                submodule = importlib.import_module(f"datasets.{file.stem}")
+                importlib.reload(submodule)
+                ds = inspect.getmembers(submodule, is_cvde_dataset)
+                datasets.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
+        return datasets

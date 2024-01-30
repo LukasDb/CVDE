@@ -1,55 +1,46 @@
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 import streamlit_scrollable_textbox as stx  # type: ignore
-from streamlit_tags import st_tags  # type: ignore
+import itertools as it
 import os
 import yaml
 import numpy as np
 import plotly.graph_objects as go  # type: ignore
-from typing import Type
 import time
-from PIL import Image
 
-from cvde.job.job_tracker import JobTracker, LogEntry
+from cvde.job.run_logger import RunLogger
+from .page import Page
 
 
-class JobInspector:
+class JobInspector(Page):
     def __init__(self) -> None:
+        pass
+
+    def run(self) -> None:
         self.expanders: dict[str, DeltaGenerator] = {}
         self.expand_all = False
-        self.runs = os.listdir("log")
-        all_trackers = [JobTracker.from_log(run) for run in self.runs]
-        all_trackers.sort(key=lambda t: t.started, reverse=True)
-
-        if "tags" not in st.session_state:
-            st.session_state.tags = set()
-        self.tags: set[str] = st.session_state.tags
-        self.tags.clear()
-        for t in all_trackers:
-            for tag in t.tags:
-                self.tags.add(tag)
+        runs = os.listdir("log")
+        all_logs = [RunLogger.from_log(run) for run in runs]
+        all_logs.sort(key=lambda t: t.started, reverse=True)
 
         with st.sidebar:
             st.subheader("Settings")
             self.use_time = st.checkbox("Use actual time")
             self.log_axes = st.checkbox("Logarithmic", value=True)
             self.expand_all = st.checkbox("Expand all")
-            selected_tags = st.multiselect("Filter by tags", options=self.tags)
+            selected_tags = st.multiselect("Filter by tags", options=st.session_state.tags)
             cols = st.columns(2)
             cols[0].subheader("Logged runs", anchor=False)
-            all_selected = cols[1].checkbox(
-                "Select all", on_change=self.select_all, key="select_all"
-            )
+            all_selected = cols[1].checkbox("Select all")
 
-        self.active_trackers: list[JobTracker] = []
-        for t in all_trackers:
-            has_a_selected_tag = any(tag in selected_tags for tag in t.tags)
+        selected_logs: list[RunLogger] = []
+        for log in all_logs:
+            has_a_selected_tag = any(tag in selected_tags for tag in log.tags)
             if len(selected_tags) > 0 and not has_a_selected_tag:
                 continue
-            if st.sidebar.checkbox(
-                t.display_name, value=all_selected, key="select_" + t.unique_name
-            ):
-                self.active_trackers.append(t)
+
+            if st.sidebar.checkbox(log.display_name, value=all_selected):
+                selected_logs.append(log)
 
         with st.sidebar:
             [st.text("") for i in range(10)]  # vertical spacing
@@ -59,49 +50,43 @@ class JobInspector:
                 delete_button.button("Confirm?", key="confirm_delete_jobs")
 
             if st.session_state.get("confirm_delete_jobs", False):
-                for t in self.active_trackers:
-                    if t.in_progress:
-                        st.error(f"Can't delete running job {t.name}")
+                for log in selected_logs:
+                    if log.is_in_progress():
+                        st.error(f"Can't delete running job {log.name}")
                     else:
-                        t.delete_log()
+                        log.delete_log()
                 time.sleep(0.5)
-                st.experimental_rerun()
+                st.rerun()
 
         st.subheader("Runs", anchor=False)
 
-    def run(self) -> None:
-        # trackers = self.get_selected_trackers()  # also builds the sidebar
-        trackers = self.active_trackers
-        trackers.sort(key=lambda t: t.started, reverse=True)
-
         # extract variable names
-        var_names = []
-        for t in trackers:
-            var_names.extend(t.vars)
-        var_names = np.unique(var_names)
+        var_names = np.unique([var_name for log in selected_logs for var_name in log.vars])
 
-        if len(trackers) > 0:
-            cols = st.columns(len(trackers))
-            for tracker, col in zip(trackers, cols):
-                with col:
-                    tags = st_tags(
-                        value=tracker.tags,
-                        label=f"{tracker.display_name}",
-                        suggestions=list(self.tags),
-                        key="tags_" + tracker.unique_name,
-                        text="Add tags...",
-                    )
-                    for tag in tags:
-                        self.tags.add(tag)
-                    tracker.set_tags(tags)
+        # show tags of run
+        available_colors = ["blue", "green", "orange", "red", "violet"]
+        color = {
+            tag: color for tag, color in zip(st.session_state.tags, it.cycle(available_colors))
+        }
+
+        if len(selected_logs) > 0:
+            # build a grid of n columns for 3 rows
+            rows = [st.columns(len(selected_logs), gap="small") for i in range(3)]
+            for i, log in enumerate(selected_logs):
+                with rows[0][i]:
+                    st.subheader(log.name, anchor=False)
+                with rows[1][i]:
+                    st.caption("; ".join([f":{color[tag]}[{tag}]" for tag in log.tags]))
+                with rows[2][i]:
+                    st.caption(log.started)
 
         # display data
         # for each variable name, assemble plot of data
         for var_name in var_names:
             fig = None
-            for t in trackers:
+            for log in selected_logs:
                 try:
-                    run_data = t.read_var(var_name)
+                    run_data = log.read_var(var_name)
                 except FileNotFoundError:
                     continue
 
@@ -130,7 +115,7 @@ class JobInspector:
                             label_visibility="hidden",
                             max_value=len(y) - 1,
                             value=len(y) - 1,
-                            key="num_epoch_" + var_name + t.unique_name,
+                            key="num_epoch_" + var_name + log.folder_name,
                         )
                     else:
                         epoch = 0
@@ -138,13 +123,13 @@ class JobInspector:
                     # read img
                     # img = Image.open(img_path)
 
-                    exp.image(img_path, caption=f"{t.display_name}")
+                    exp.image(img_path, caption=f"{log.display_name}")
 
                 else:
                     if fig is None:
                         fig = go.Figure()
 
-                    fig.add_scatter(x=x, y=y, name=t.display_name, showlegend=True)
+                    fig.add_scatter(x=x, y=y, name=log.display_name, showlegend=True)
                     exp = self.get_expander(var_name, create_empty=True)
                     if self.log_axes:
                         fig.update_yaxes(type="log")
@@ -152,36 +137,40 @@ class JobInspector:
                     exp.plotly_chart(fig)
 
         conf_exp = st.expander("Config")
-        if len(trackers) == 0:
+        if len(selected_logs) == 0:
             return
-        cols = conf_exp.columns(len(trackers))
-        for col, tracker in zip(cols, trackers):
-            col.text(f"{tracker.name} ({tracker.started})")
-            col.code(yaml.dump(tracker.config), language="yaml")
+        cols = conf_exp.columns(len(selected_logs))
+
+        for column, log in zip(cols, selected_logs):
+            column.text(f"{log.name} ({log.started})")
+            column.code(yaml.dump(log.config), language="yaml")
 
         stdout_exp = st.expander("Stdout")
-        cols = stdout_exp.columns(len(trackers))
-        for tracker, col in zip(trackers, cols):
-            col.text(f"{tracker.name} ({tracker.started})")
-            with col:
+        cols = stdout_exp.columns(len(selected_logs))
+        for log, column in zip(selected_logs, cols):
+            column.text(f"{log.name} ({log.started})")
+            with column:
                 stx.scrollableTextbox(
-                    tracker.get_stdout(),
+                    log.get_stdout(),
                     height=400,
                     fontFamily="monospace",
-                    key=tracker.unique_name + "_stdout",
+                    key=log.folder_name + "_stdout",
                 )
 
         stderr_exp = st.expander("Stderr")
-        cols = stderr_exp.columns(len(trackers))
-        for tracker, col in zip(trackers, cols):
-            col.text(f"{tracker.name} ({tracker.started})")
-            with col:
+        cols = stderr_exp.columns(len(selected_logs))
+        for log, column in zip(selected_logs, cols):
+            column.text(f"{log.name} ({log.started})")
+            with column:
                 stx.scrollableTextbox(
-                    tracker.get_stderr(),
+                    log.get_stderr(),
                     height=400,
                     fontFamily="monospace",
-                    key=tracker.unique_name + "_stderr",
+                    key=log.folder_name + "_stderr",
                 )
+
+    def on_leave(self) -> None:
+        return super().on_leave()
 
     def get_expander(self, var_name: str, create_empty: bool = False) -> DeltaGenerator:
         if var_name not in self.expanders:
@@ -194,8 +183,3 @@ class JobInspector:
                 self.expanders[var_name] = container
 
         return self.expanders[var_name]
-
-    def select_all(self) -> None:
-        for key in st.session_state.keys():
-            if isinstance(key, str) and key.startswith("select_"):
-                st.session_state[key] = st.session_state["select_all"]

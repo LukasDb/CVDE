@@ -4,8 +4,7 @@ import pathlib
 import subprocess
 import click
 from pathlib import Path
-
-from cvde.workspace import Workspace as WS
+import cvde
 
 
 @click.group()
@@ -15,26 +14,10 @@ def run() -> None:
 
 
 @run.command()
-@click.argument("name")
-def execute(name: str) -> None:
-    "Execute a given task"
-    raise NotImplementedError
-    # JobExecutor.run_job(name)
-
-
-@run.command()
-@click.argument("type")
-@click.argument("name")
-def create(type: str, name: str) -> None:
-    "Create a new module of type {data|model|config|task}"
-    raise NotImplementedError
-
-
-@run.command()
 @click.option("-n", "--name", help="Name of the workspace")
 def init(name: str) -> None:
     "Create an empty workspace"
-    WS().init_workspace(name)
+    cvde.Workspace.init_workspace(name)
 
 
 @run.command()
@@ -43,13 +26,14 @@ def init(name: str) -> None:
 def gui(port: int, root: Path) -> None:
     "Run CVDE GUI in your browser"
 
-    gui_file = Path(__file__).parent / "gui.py"
+    # gui_file = Path(__file__).parent / "main_gui.py"
+    gui_file = Path(cvde.main_gui.__file__).resolve()
 
     streamlit_config = [
-        "--server.runOnSave",
-        "true",
         "--server.port",
         str(port),
+        "--server.headless",
+        "true",
     ]
 
     proc = subprocess.Popen(
@@ -65,7 +49,3 @@ def gui(port: int, root: Path) -> None:
         logging.warning("User interrupted.")
     finally:
         proc.kill()
-
-
-def summary() -> None:
-    print(WS().summary())

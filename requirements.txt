@@ -7,9 +7,9 @@ opencv-python
 plotbbox
 streamlit_ace
 streamlit_scrollable_textbox
-streamlit-tags
 pyyaml
 plotly
 colorama
 tqdm
 psutil
+graphviz

@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit.runtime import Runtime
 
 
 def notify(*args: str) -> None:
@@ -18,3 +19,9 @@ def warn(*args: str) -> None:
 
     else:
         st.warning(message)
+
+
+def update_gui_from_thread() -> None:
+    runtime: Runtime = Runtime.instance()
+    for session in [s.session for s in runtime._session_mgr.list_sessions()]:
+        session._handle_rerun_script_request()

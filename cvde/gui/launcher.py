@@ -1,18 +1,13 @@
 import streamlit as st
 import streamlit_ace as st_ace  # type: ignore
-from streamlit_tags import st_tags  # type: ignore
-from typing import List
 import pathlib
 import datetime
-
+import yaml
 import cvde
-import cvde.gui
-from cvde.workspace import Workspace as WS
-from cvde.workspace import ModuleExistsError
-import cvde.workspace_tools as ws_tools
+from .page import Page
 
 
-class Launcher:
+class Launcher(Page):
     ace_options = {
         "language": "yaml",
         "show_gutter": False,
@@ -23,53 +18,120 @@ class Launcher:
     }
 
     def __init__(self) -> None:
-        self.configs = list(WS().configs)
-        self.configs.sort()
+        if "last_submitted" not in st.session_state:
+            st.session_state.last_submitted = None
 
     def run(self) -> None:
-        top_row = st.columns([1, 1, 1, 1, 1])
-        bottom_row = st.columns([1, 1, 1, 1, 1])
+        if not cvde.Workspace().git_tracking_enabled:
+            st.warning(
+                "Git Tracking is not enabled! This means, the code at job submit time might be different from the code when the job is actually launched. Git Tracking saves a snapshot of your code at submission time and checks out to it when launching the job. To enable Git Tracking, run `cvde init` in your workspace directory."
+            )
+        st.subheader("Job Queue")
+        scheduler: cvde.Scheduler = st.session_state["scheduler"]
+        st.graphviz_chart(scheduler.get_digraph())
 
-        job_names = [x.__name__ for x in WS().jobs]
-        job_name = bottom_row[0].selectbox("Job", job_names)
-        assert isinstance(job_name, str)
-        config_name = bottom_row[1].selectbox("Config", WS().configs)
-        assert isinstance(config_name, str)
-        now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-        run_name = bottom_row[2].text_input(
-            "Run",
-            placeholder=f"{now}_{job_name}_{config_name}",
-            help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
-        )
-        with bottom_row[3]:
-            tags = st_tags(
-                label="Tags",
-                text="Add tags...",
-                value=[],
+        self.configs = cvde.Workspace().list_configs()
+
+        with st.sidebar:
+            with st.form(clear_on_submit=True, key="add_tag_form", border=True):
+                new_tag = st.text_input("Add new tags")
+                st.form_submit_button(
+                    "Add new tag",
+                )
+
+        with st.sidebar.container(border=True):
+            st.subheader("Submit Job")
+
+            # choose job
+            job_names = list(cvde.Workspace().list_jobs().keys())
+            job_name = st.selectbox("Job", job_names)
+            assert isinstance(job_name, str)
+
+            # choose config
+            config_name = st.selectbox("Config", list(self.configs.keys()))
+            assert isinstance(config_name, str)
+            now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+            default_run_name = f"{now}_{job_name}_{config_name}"
+
+            # choose environment variables
+            env_string = st.text_input(
+                "Environment Variables",
+                value="CUDA_VISIBLE_DEVICES=0",
+                help="Set environment variables and separate with semicolons.",
+            )
+            env = {
+                key.strip(): value.strip()
+                for key, value in [word.split("=") for word in env_string.split(";")]
+            }
+
+            # choose run name
+            run_name = st.text_input(
+                "Run Name",
+                value=default_run_name,
+                help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
+            )
+            if len(run_name) == 0:
+                run_name = default_run_name
+
+            default_tag = None
+            if len(new_tag) > 0:
+                st.session_state.tags.add(new_tag)
+                default_tag = new_tag
+
+            tags = st.multiselect(
+                "Choose Tags", list(st.session_state.tags), key="choose_tags", default=default_tag
             )
 
-        if len(run_name) == 0:
-            run_name = job_name + "_" + config_name
+            options = scheduler.get_scheduled_submissions()
+            default = (
+                st.session_state.last_submitted
+                if st.session_state.last_submitted in options
+                else None
+            )
+            after = st.multiselect(
+                "Wait for job",
+                default=default,
+                options=options,
+                format_func=lambda x: x.run_name,
+                key="wait_for_job",
+                help="Choose jobs to wait for before starting this one. Otherwise the job will be launched immediately and parallel to other jobs.",
+            )
 
-        if top_row[0].button("Launch", use_container_width=True):
-            self.launch_job(job_name, config_name, run_name, tags=tags)
+            submit = st.button("Submit", use_container_width=True, type="primary")
 
         if config_name is None:
             return
 
+        # load file directly to preserve comments
         config_path = pathlib.Path("configs/" + config_name + ".yml")
         with config_path.open() as F:
-            config = F.read()
-        new_config = st_ace.st_ace(config, **self.ace_options, key="ace_" + config_name)
-        if new_config != config:
-            with config_path.open("w") as F:
-                F.write(new_config)
+            config_text = F.read()
 
-    def launch_job(self, job_name, config_name, run_name, tags: List[str]) -> None:
-        WS().reload_modules()
-        job_fn = cvde.ws_tools.load_job(job_name)
-        job = job_fn(config_name=config_name, run_name=run_name, tags=tags)
-        job.launch()
-        cvde.gui.notify(
-            f"Launching job '{job_name}' with config '{config_name}' and run name '{run_name}'."
-        )
+        st.subheader(f"Config Editor: {config_name}")
+        new_config_text = st_ace.st_ace(config_text, **self.ace_options, key="ace_" + config_name)
+        if new_config_text != config_text:
+            with config_path.open("w") as F:
+                F.write(new_config_text)
+
+        try:
+            config = yaml.load(new_config_text, Loader=yaml.Loader)
+        except Exception as e:
+            st.error("Error parsing config file.")
+            return
+
+        if submit:
+            submission = cvde.job.JobSubmission(
+                config=config,
+                job_name=job_name,
+                run_name=run_name,
+                tags=tags,
+                env=env,
+            )
+            st.session_state.last_submitted = submission
+
+            scheduler.submit(submission, after)
+            cvde.gui.notify(f"{run_name} submitted.")
+            st.rerun()
+
+    def on_leave(self) -> None:
+        return super().on_leave()

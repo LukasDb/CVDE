@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cvde",
-    version="0.6.0",
+    version="0.7.0",
     description="A development environment for supervised deep learning in computer vision",
     url="https://github.com/LukasDb/CVDE",
     author="Lukas Dirnberger",
@@ -11,7 +11,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=open("requirements.txt").readlines(),
-    entry_points= {"console_scripts": ["cvde = cvde.__main__:run"]},
+    entry_points={"console_scripts": ["cvde = cvde.__main__:run"]},
     classifiers=[
         "Intended Audience :: Science/Research",
         "Operating System :: POSIX :: Linux",
