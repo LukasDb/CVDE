@@ -58,6 +58,7 @@ class Launcher(Page):
                 "Environment Variables",
                 value="CUDA_VISIBLE_DEVICES=0",
                 help="Set environment variables and separate with semicolons.",
+                key="run_env_vars_input"
             )
             env = {
                 key.strip(): value.strip()
@@ -69,6 +70,7 @@ class Launcher(Page):
                 "Run Name",
                 value=default_run_name,
                 help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
+                key="run_name_input",
             )
             if len(run_name) == 0:
                 run_name = default_run_name

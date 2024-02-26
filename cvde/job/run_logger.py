@@ -78,8 +78,9 @@ class RunLogger:
                 F.write(submission.commit)
 
             assert submission.diff is not None
-            with (root / "uncommitted.diff").open("w") as F:
-                F.write(submission.diff)
+            if len(submission.diff) > 0:
+                with (root / "uncommitted.diff").open("w") as F:
+                    F.write(submission.diff)
 
         # copy job config; to preserve comments, dont dump yaml
         job_config_path = root / "job.yml"

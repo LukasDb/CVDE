@@ -140,24 +140,22 @@ def _run(submission: JobSubmission) -> None:
 
     if cvde.Workspace().git_tracking_enabled:
         subprocess.run(
-            ["git", "clone", ".", logger.workspace.resolve()], capture_output=True
+            ["git", "clone", ".", str(logger.workspace.resolve())], capture_output=True
         ).check_returncode()
 
         os.chdir(logger.workspace)
         assert submission.commit is not None
         assert submission.diff is not None
 
-        print("Checkout out to last commit at submission time.")
-        print(submission.commit)
         subprocess.run(
             ["git", "checkout", submission.commit], capture_output=True
         ).check_returncode()
-        print("Applying uncommitted changes at submission time.")
 
-        subprocess.run(
-            ["git", "apply", logger.root.joinpath("uncommitted.diff").resolve()],
-            capture_output=True,
-        ).check_returncode()
+        if logger.root.joinpath("uncommitted.diff").exists():
+            subprocess.run(
+                ["git", "apply", str(logger.root.joinpath("uncommitted.diff").resolve())],
+                capture_output=True,
+            ).check_returncode()
 
     job_fn = cvde.Workspace().list_jobs()[submission.job_name]
     job = job_fn(logger=logger, config=submission.config)
