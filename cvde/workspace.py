@@ -20,7 +20,6 @@ def persistent_stop_queue() -> set:
 class Workspace:
     _instance: "Workspace|None" = None
     FOLDERS = ["models", "datasets", "jobs", "losses", "configs", "log"]
-    meta_file = pathlib.Path(".workspace.cvde")
     default_git_ignore = [
         "**/__pycache__",
         "*.pt",
@@ -39,39 +38,22 @@ class Workspace:
         return cls._instance
 
     def __init__(self) -> None:
-        try:
-            with self.meta_file.open("r") as F:
-                state = json.load(F)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f".workspace.cvde not found. Are you in a CVDE workspace? (Currently: {os.getcwd()})"
-            )
+        self.name = pathlib.Path(os.getcwd()).name
+        self.git_tracking_enabled = pathlib.Path('.git').exists()
 
-        self.name = state["name"]
-        self.created = state["created"]
-        self.git_tracking_enabled = state.get("git_tracking_enabled", False)
 
     @staticmethod
     def init_workspace(name: str) -> None:
-        if Workspace.meta_file.exists():
-            print(f"Found existing CVDE workspace ({Workspace().name}).")
-            if not Workspace().git_tracking_enabled:
-                print("Git tracking is disabled.")
-                Workspace().enable_git_tracking()
-                exit(0)
-            else:
-                print("Found existing CVDE workspace")
-                exit(-1)
 
         logging.info("Creating CVDE workspace...")
         if len(os.listdir()) > 0:
             logging.error("Directory is not empty!")
             exit(-1)
 
-        created: str = datetime.now().strftime("%Y-%m-%d")
-        state = {"name": name, "created": created, "git_tracking_enabled": False}
-        with Workspace.meta_file.open("w") as F:
-            json.dump(state, F, indent=4)
+        if not Workspace().git_tracking_enabled:
+            print("Git tracking is disabled.")
+            Workspace().enable_git_tracking()
+            exit(0)
 
         for folder in Workspace.FOLDERS:
             os.makedirs(folder)
@@ -162,9 +144,6 @@ class Workspace:
             subprocess.run(["git", "init"])
             new_repo = True
 
-        state = {"name": self.name, "created": self.created, "git_tracking_enabled": True}
-        with Workspace.meta_file.open("w") as F:
-            json.dump(state, F, indent=4)
 
         if new_repo:
             # only add changes if repo is new

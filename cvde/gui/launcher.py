@@ -44,22 +44,42 @@ class Launcher(Page):
 
             # choose job
             job_names = list(cvde.Workspace().list_jobs().keys())
-            job_name = st.selectbox("Job", job_names)
+            index = (
+                0
+                if st.session_state.get("launcher_job_select", None) is None
+                else job_names.index(st.session_state["launcher_job_select"])
+            )
+            job_name = st.selectbox("Job", job_names, index=index)
+            st.session_state["launcher_job_select"] = job_name
+
             assert isinstance(job_name, str)
 
             # choose config
-            config_name = st.selectbox("Config", list(self.configs.keys()))
+            configs = list(self.configs.keys())
+            index = (
+                0
+                if st.session_state.get("launcher_config_select", None) is None
+                else configs.index(st.session_state["launcher_config_select"])
+            )
+            config_name = st.selectbox("Config", configs, index=index)
             assert isinstance(config_name, str)
+            st.session_state["launcher_config_select"] = config_name
+
             now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
             default_run_name = f"{now}_{job_name}_{config_name}"
 
             # choose environment variables
             env_string = st.text_input(
                 "Environment Variables",
-                value="CUDA_VISIBLE_DEVICES=0",
+                value = st.session_state.get("launcher_env_string", ""),
+                placeholder="CUDA_VISIBLE_DEVICES=0",
                 help="Set environment variables and separate with semicolons.",
-                key="run_env_vars_input"
             )
+            if env_string == "":
+                env_string = "CUDA_VISIBLE_DEVICES=0"
+            else:
+                st.session_state["launcher_env_string"] = env_string
+
             env = {
                 key.strip(): value.strip()
                 for key, value in [word.split("=") for word in env_string.split(";")]
@@ -68,7 +88,7 @@ class Launcher(Page):
             # choose run name
             run_name = st.text_input(
                 "Run Name",
-                value=default_run_name,
+                placeholder=default_run_name,
                 help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
                 key="run_name_input",
             )
