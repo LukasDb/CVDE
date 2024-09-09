@@ -1,6 +1,7 @@
 import time
 import os
 import itertools as it
+from pathlib import Path
 import streamlit as st
 import cvde
 from .page import Page
@@ -12,6 +13,9 @@ class Dashboard(Page):
         pass
 
     def run(self) -> None:
+        log_dir = Path("log")
+        if not log_dir.exists():
+            log_dir.mkdir()            
         log_folders = os.listdir("log")
         all_logs = [cvde.job.RunLogger.from_log(folder) for folder in log_folders]
         running_logs = [l for l in all_logs if l.is_in_progress()]

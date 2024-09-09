@@ -11,13 +11,13 @@ class DataExplorer(Page):
         if "data_index" not in st.session_state:
             st.session_state["data_index"] = 0
 
-        datasets: dict[str, type[cvde.tf.Dataset]] = cvde.Workspace().list_datasets()
+        dataloaders: dict[str, type[cvde.tf.Dataset]] = cvde.Workspace().list_dataloaders()
         configs = cvde.Workspace().list_configs()
 
         # build data viewer
         col1, col2, col3 = st.columns(3)
         dataset_name = col1.selectbox(
-            "Data source", list(datasets.keys()), on_change=self.clear_cache
+            "Data source", list(dataloaders.keys()), on_change=self.clear_cache
         )
         config_name = col2.selectbox("Config", list(configs.keys()), on_change=self.clear_cache)
         if config_name is None:
@@ -38,7 +38,7 @@ class DataExplorer(Page):
 
         if "loaded_dataset" not in st.session_state:
             with st.spinner("Loading dataset..."):
-                dataset = datasets[dataset_name](**config)
+                dataset = dataloaders[dataset_name](**config)
             st.session_state["loaded_dataset"] = dataset
         else:
             dataset = st.session_state["loaded_dataset"]

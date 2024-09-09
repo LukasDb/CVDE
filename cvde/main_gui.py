@@ -2,6 +2,7 @@ import sys
 import os
 
 import streamlit as st
+from pathlib import Path
 from datetime import datetime
 import cvde
 import requests
@@ -24,6 +25,7 @@ class GUI:
         # initialize tags
         if "tags" not in st.session_state:
             st.session_state.tags = set()
+            Path("log").mkdir(exist_ok=True, parents=False)
             runs = os.listdir("log")
             all_logs = [cvde.job.RunLogger.from_log(run) for run in runs]
             all_logs.sort(key=lambda t: t.started, reverse=True)

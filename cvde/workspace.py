@@ -11,6 +11,8 @@ import streamlit as st
 import cvde
 import inspect
 
+from cvde.gui import notify
+
 
 @st.cache_resource
 def persistent_stop_queue() -> set:
@@ -19,7 +21,7 @@ def persistent_stop_queue() -> set:
 
 class Workspace:
     _instance: "Workspace|None" = None
-    FOLDERS = ["models", "datasets", "jobs", "losses", "configs", "log"]
+    FOLDERS = ["models", "dataloaders", "jobs", "losses", "configs", "log"]
     default_git_ignore = [
         "**/__pycache__",
         "*.pt",
@@ -39,8 +41,7 @@ class Workspace:
 
     def __init__(self) -> None:
         self.name = pathlib.Path(os.getcwd()).name
-        self.git_tracking_enabled = pathlib.Path('.git').exists()
-
+        self.git_tracking_enabled = pathlib.Path(".git").exists()
 
     @staticmethod
     def init_workspace(name: str) -> None:
@@ -144,7 +145,6 @@ class Workspace:
             subprocess.run(["git", "init"])
             new_repo = True
 
-
         if new_repo:
             # only add changes if repo is new
             subprocess.run(["git", "add", "--all"])
@@ -171,22 +171,34 @@ class Workspace:
             if file.is_file() and file.suffix == ".yml":
                 with file.open() as F:
                     try:
-                        config: dict|None = yaml.load(F, Loader=yaml.Loader)
+                        config: dict | None = yaml.load(F, Loader=yaml.Loader)
                     except Exception:
                         config = None
 
                     configs[file.stem] = config
         return configs
 
-    def list_datasets(self) -> dict[str, type[cvde.tf.Dataset]]:
+    def list_dataloaders(self) -> dict[str, type[cvde.tf.Dataset]]:
         def is_cvde_dataset(cls: type) -> bool:
             return inspect.isclass(cls) and issubclass(cls, cvde.tf.Dataset)
 
-        datasets: dict[str, type[cvde.tf.Dataset]] = {}
-        for file in pathlib.Path("datasets").iterdir():
+        dataloaders: dict[str, type[cvde.tf.Dataset]] = {}
+
+        try:
+            contents = list(pathlib.Path("dataloaders").iterdir())
+        except FileNotFoundError:
+            if pathlib.Path("datasets").exists():
+                warning = (
+                    "WARNING: 'datasets' folder is deprecated, please rename it to 'dataloaders'"
+                )
+                notify(warning)
+                logging.error(warning)
+            raise ValueError(f"Could not find folder 'dataloader'! ({warning})")
+
+        for file in contents:
             if file.is_file() and file.suffix == ".py" and file.stem != "__init__":
-                submodule = importlib.import_module(f"datasets.{file.stem}")
+                submodule = importlib.import_module(f"dataloaders.{file.stem}")
                 importlib.reload(submodule)
                 ds = inspect.getmembers(submodule, is_cvde_dataset)
-                datasets.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
-        return datasets
+                dataloaders.update({d[0]: d[1] for d in ds if not d[0].startswith("_")})
+        return dataloaders
