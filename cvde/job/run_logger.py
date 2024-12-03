@@ -162,6 +162,8 @@ class RunLogger:
 
         var_path = self.var_root / name / f"{index:06}.pkl"
 
+        var = np.nan_to_num(var, copy=True)
+
         if len(var.shape) >= 2:
             # save as jpg
             img_path = self.var_root / name / f"{index:06}.png"

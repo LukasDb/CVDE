@@ -94,9 +94,9 @@ class GUI:
         st.title(t, anchor=False)
         c1, c2 = st.columns([1, 20])
         c1.button("⟳", key=t + "_reload")
-        c2.markdown(
-            f'{current_weather} *Last update: {st.session_state["last_weather_update"].strftime("%H:%M:%S")}*'
-        )
+        # c2.markdown(
+        #     f'{current_weather} *Last update: {st.session_state["last_weather_update"].strftime("%H:%M:%S")}*'
+        # )
 
 
 if __name__ == "__main__":
