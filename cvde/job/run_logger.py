@@ -31,7 +31,7 @@ class RunLogger:
             meta = json.load(F)
 
         self.folder_name = folder_name
-        self.name = meta["name"]
+        self._name = meta["name"]
         self.job_name = meta["job"]
         self.started = meta["started"]
         self.tags = meta["tags"]
@@ -102,6 +102,19 @@ class RunLogger:
 
         tracker = RunLogger(folder_name)
         return tracker
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
+        with (self.root / "log.json").open() as F:
+            data = json.load(F)
+        data["name"] = value
+        with (self.root / "log.json").open("w") as F:
+            json.dump(data, F, indent=2)
 
     @property
     def display_name(self) -> str:

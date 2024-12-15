@@ -134,7 +134,7 @@ class JobInspector(Page):
                     if self.log_axes:
                         fig.update_yaxes(type="log")
                     fig.update_layout(legend=dict(orientation="h"))
-                    exp.plotly_chart(fig, key=log.display_name+var_name) # unique key
+                    exp.plotly_chart(fig, key=log.display_name + var_name)  # unique key
 
         conf_exp = st.expander("Config")
         if len(selected_logs) == 0:
@@ -168,6 +168,21 @@ class JobInspector(Page):
                     fontFamily="monospace",
                     key=log.folder_name + "_stderr",
                 )
+
+        rename_exp = st.expander("Rename")
+        cols = rename_exp.columns(len(selected_logs))
+        for log, col in zip(selected_logs, cols):
+            name = col.text_input(
+                "Name",
+                placeholder=log.name,
+                key=log.folder_name,
+                label_visibility="hidden",
+                help="Rename the job to a more descriptive name.",
+            )
+
+            if name is not None and len(name) > 0:
+                st.toast(f"renamed job: {name}")
+                log.name = name
 
     def on_leave(self) -> None:
         return super().on_leave()
