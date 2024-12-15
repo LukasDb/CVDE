@@ -65,8 +65,7 @@ class Launcher(Page):
             assert isinstance(config_name, str)
             st.session_state["launcher_config_select"] = config_name
 
-            now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-            default_run_name = f"{now}_{job_name}_{config_name}"
+
 
             # choose environment variables
             env_string = st.text_input(
@@ -86,14 +85,27 @@ class Launcher(Page):
             }
 
             # choose run name
+            now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+            default_run_name = f"{now}_{job_name}_{config_name}"
             run_name = st.text_input(
                 "Run Name",
+                value=st.session_state.get("launcher_run_name", ""),
                 placeholder=default_run_name,
                 help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
-                key="run_name_input",
             )
-            if len(run_name) == 0:
+            if run_name == "":
+
                 run_name = default_run_name
+            else:
+                # sanitize run name
+                run_name = run_name.replace(" ", "_")
+                run_name = run_name.replace(".", "_")
+                run_name = run_name.replace("/", "_")
+                run_name = run_name.replace("\\", "_")
+                run_name = run_name.replace(":", "_")
+                run_name = run_name.replace(";", "_")
+                run_name = run_name.replace(",", "_")
+                st.session_state["launcher_run_name"] = run_name
 
             default_tag = None
             if len(new_tag) > 0:
@@ -105,14 +117,9 @@ class Launcher(Page):
             )
 
             options = scheduler.get_scheduled_submissions()
-            default = (
-                st.session_state.last_submitted
-                if st.session_state.last_submitted in options
-                else None
-            )
+            
             after = st.multiselect(
                 "Wait for job",
-                default=default,
                 options=options,
                 format_func=lambda x: x.run_name,
                 key="wait_for_job",

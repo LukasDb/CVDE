@@ -134,7 +134,7 @@ class JobInspector(Page):
                     if self.log_axes:
                         fig.update_yaxes(type="log")
                     fig.update_layout(legend=dict(orientation="h"))
-                    exp.plotly_chart(fig)
+                    exp.plotly_chart(fig, key=log.display_name+var_name) # unique key
 
         conf_exp = st.expander("Config")
         if len(selected_logs) == 0:
