@@ -5,6 +5,7 @@ import datetime
 import yaml
 import cvde
 from .page import Page
+import wonderwords
 
 
 class Launcher(Page):
@@ -49,7 +50,8 @@ class Launcher(Page):
                 if st.session_state.get("launcher_job_select", None) is None
                 else job_names.index(st.session_state["launcher_job_select"])
             )
-            job_name = st.selectbox("Job", job_names, index=index)
+            st.markdown("Job")
+            job_name = st.selectbox("Job", job_names, index=index, label_visibility="collapsed")
             st.session_state["launcher_job_select"] = job_name
 
             assert isinstance(job_name, str)
@@ -61,23 +63,20 @@ class Launcher(Page):
                 if st.session_state.get("launcher_config_select", None) is None
                 else configs.index(st.session_state["launcher_config_select"])
             )
-            config_name = st.selectbox("Config", configs, index=index)
+            st.markdown("Config")
+            config_name = st.selectbox("Config", configs, index=index, label_visibility="collapsed")
             assert isinstance(config_name, str)
             st.session_state["launcher_config_select"] = config_name
 
-
-
             # choose environment variables
+            st.markdown("Environment Variables")
             env_string = st.text_input(
                 "Environment Variables",
-                value = st.session_state.get("launcher_env_string", ""),
-                placeholder="CUDA_VISIBLE_DEVICES=0",
+                value=st.session_state.get("launcher_env_string", "CUDA_VISIBLE_DEVICES=0"),
                 help="Set environment variables and separate with semicolons.",
+                label_visibility="collapsed",
             )
-            if env_string == "":
-                env_string = "CUDA_VISIBLE_DEVICES=0"
-            else:
-                st.session_state["launcher_env_string"] = env_string
+            st.session_state["launcher_env_string"] = env_string
 
             env = {
                 key.strip(): value.strip()
@@ -85,27 +84,36 @@ class Launcher(Page):
             }
 
             # choose run name
-            now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-            default_run_name = f"{now}_{job_name}_{config_name}"
-            run_name = st.text_input(
+            # now = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+            # default_run_name = f"{now}_{job_name}_{config_name}"
+
+            st.markdown("Run name")
+            c1, c2 = st.columns([3, 1])
+            if c2.button("🔄") or "launcher_run_name" not in st.session_state:
+                r = wonderwords.RandomWord()
+                word1 = r.word(
+                    include_parts_of_speech=["adjectives"], word_min_length=4, word_max_length=8
+                )
+                word2 = r.word(
+                    include_parts_of_speech=["nouns"], word_min_length=4, word_max_length=8
+                )
+                st.session_state["launcher_run_name"] = f"{word1}_{word2}"
+
+            run_name = c1.text_input(
                 "Run Name",
                 value=st.session_state.get("launcher_run_name", ""),
-                placeholder=default_run_name,
-                help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
+                label_visibility="collapsed",
+                # help="To help distinguish runs with similar configs, you can give your experiment a custom name.",
             )
-            if run_name == "":
+            st.session_state["launcher_run_name"] = run_name
 
-                run_name = default_run_name
-            else:
-                # sanitize run name
-                run_name = run_name.replace(" ", "_")
-                run_name = run_name.replace(".", "_")
-                run_name = run_name.replace("/", "_")
-                run_name = run_name.replace("\\", "_")
-                run_name = run_name.replace(":", "_")
-                run_name = run_name.replace(";", "_")
-                run_name = run_name.replace(",", "_")
-                st.session_state["launcher_run_name"] = run_name
+            run_name = run_name.replace(" ", "_")
+            run_name = run_name.replace(".", "_")
+            run_name = run_name.replace("/", "_")
+            run_name = run_name.replace("\\", "_")
+            run_name = run_name.replace(":", "_")
+            run_name = run_name.replace(";", "_")
+            run_name = run_name.replace(",", "_")
 
             default_tag = None
             if len(new_tag) > 0:
@@ -117,7 +125,7 @@ class Launcher(Page):
             )
 
             options = scheduler.get_scheduled_submissions()
-            
+
             after = st.multiselect(
                 "Wait for job",
                 options=options,
